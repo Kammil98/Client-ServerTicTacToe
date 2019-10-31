@@ -19,6 +19,7 @@ import javax.swing.JPanel;
  */
 public class MainWindowFrame extends javax.swing.JFrame {
     public JPanel activePanel;
+    private AnimationDrawer drawer;
     /**
      * Creates new form MainWindowFrame
      */
@@ -26,35 +27,13 @@ public class MainWindowFrame extends javax.swing.JFrame {
         super("Tic Tac Toe");
         initComponents();
         setLayout(new BorderLayout(0, 0));
-        JPanel panel = new GameJPanel();
-        add(panel, BorderLayout.CENTER);
-        panel.setVisible(true);
+        activePanel = new GameJPanel();
+        add(activePanel, BorderLayout.CENTER);
+        activePanel.setVisible(true);
         pack();
         setSize(500, 400);
         setResizable(false);
-        //activePanel = new GameJPanel();
-        //javax.swing.GroupLayout layout = new javax.swing.GroupLayout(activePanel);
-        //activePanel.setLayout(layout);
-        
-        //activePanel.setVisible(true);
-        //this.add(activePanel);
-        //activePanel.setVisible(true);
-        //pack();
-        
-        /*Graphics g = this.getGraphics();
-        System.out.println(g);
-        Graphics2D g2d = (Graphics2D) g;
-        System.out.println("koloruje Frame");
-        System.out.println(this.getWidth());
-        g2d.setColor(Color.red);
-        g2d.draw(new Line2D.Double(0, 0, 100, 100));
-        g2d.setColor(Color.red);
-        g2d.fill(new Rectangle2D.Double(
-                10, 
-                10, 
-                100, 
-                100));
-        g2d.dispose();*/
+        drawer = new AnimationDrawer(activePanel, 40);
     }
 
     /**
@@ -65,6 +44,7 @@ public class MainWindowFrame extends javax.swing.JFrame {
         if(activePanel != null)
             activePanel.setVisible(false);
         activePanel = newPanel;
+        drawer.setPanel(activePanel);
         activePanel.setVisible(true);
     }
     /**

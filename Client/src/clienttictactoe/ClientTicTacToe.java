@@ -27,7 +27,6 @@ public class ClientTicTacToe {
      */
     public static void main(String[] args) {
         MainWindowFrame.main(args);
-        //NewJFrame.main(args);
         /*System.out.println("hello world :)");
         try {
             port = 1235;
