@@ -10,6 +10,7 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import window.MainWindowFrame;
 
 /**
  *
@@ -25,8 +26,9 @@ public class ClientTicTacToe {
      * @param args the command line arguments
      */
     public static void main(String[] args) {
-        
-        System.out.println("hello world :)");
+        MainWindowFrame.main(args);
+        //NewJFrame.main(args);
+        /*System.out.println("hello world :)");
         try {
             port = 1235;
             InetAddress addr;
@@ -43,7 +45,7 @@ public class ClientTicTacToe {
         catch (java.io.IOException e) {
             System.out.println("Can't connect to " + args[0]);
             System.out.println(e);
-        }
+        }*/
     }
     
 }
