@@ -6,11 +6,6 @@
 package window;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
-import java.awt.geom.Line2D;
-import java.awt.geom.Rectangle2D;
 import javax.swing.JPanel;
 
 /**
@@ -18,14 +13,18 @@ import javax.swing.JPanel;
  * @author kamil
  */
 public class MainWindowFrame extends javax.swing.JFrame {
-    public JPanel activePanel;
-    private AnimationDrawer drawer;
+    
+    private JPanel activePanel;
+    private final AnimationDrawer drawer;
+    
+    
     /**
      * Creates new form MainWindowFrame
      */
     public MainWindowFrame() {
         super("Tic Tac Toe");
         initComponents();
+        addMouseListener(new WindowMouseListener());
         setLayout(new BorderLayout(0, 0));
         activePanel = new GameJPanel();
         add(activePanel, BorderLayout.CENTER);
@@ -33,7 +32,7 @@ public class MainWindowFrame extends javax.swing.JFrame {
         pack();
         setSize(500, 400);
         setResizable(false);
-        drawer = new AnimationDrawer(activePanel, 40);
+        drawer = new AnimationDrawer(getActivePanel(), 40);
     }
 
     /**
@@ -41,12 +40,14 @@ public class MainWindowFrame extends javax.swing.JFrame {
      * @param newPanel - new Panel to show in JFrame
      */
     public void setActivePanel(GameJPanel newPanel) {
-        if(activePanel != null)
-            activePanel.setVisible(false);
+        if(getActivePanel() != null)
+            getActivePanel().setVisible(false);
         activePanel = newPanel;
-        drawer.setPanel(activePanel);
-        activePanel.setVisible(true);
+        drawer.setPanel(getActivePanel());
+        getActivePanel().setVisible(true);
     }
+    
+    
     /**
      * This method is called from within the constructor to initialize the form.
      * WARNING: Do NOT modify this code. The content of this method is always
@@ -88,19 +89,16 @@ public class MainWindowFrame extends javax.swing.JFrame {
                     break;
                 }
             }
-        } catch (ClassNotFoundException ex) {
-            java.util.logging.Logger.getLogger(MainWindowFrame.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (InstantiationException ex) {
-            java.util.logging.Logger.getLogger(MainWindowFrame.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (IllegalAccessException ex) {
-            java.util.logging.Logger.getLogger(MainWindowFrame.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (javax.swing.UnsupportedLookAndFeelException ex) {
+        } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | javax.swing.UnsupportedLookAndFeelException ex) {
             java.util.logging.Logger.getLogger(MainWindowFrame.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
         }
+        //</editor-fold>
+        
         //</editor-fold>
 
         /* Create and display the form */
         java.awt.EventQueue.invokeLater(new Runnable() {
+            @Override
             public void run() {
                 new MainWindowFrame().setVisible(true);
             }
@@ -109,4 +107,11 @@ public class MainWindowFrame extends javax.swing.JFrame {
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     // End of variables declaration//GEN-END:variables
+
+    /**
+     * @return the activePanel
+     */
+    public final JPanel getActivePanel() {
+        return activePanel;
+    }
 }

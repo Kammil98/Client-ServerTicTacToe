@@ -8,7 +8,6 @@ package window;
 import java.awt.Color;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.geom.Line2D;
 import java.awt.geom.Rectangle2D;
 
 /**
@@ -23,12 +22,15 @@ public class GameJPanel extends javax.swing.JPanel {
     public GameJPanel() {
         initComponents();
     }
+    /**
+     * Paint whole graphic from this JPanel
+     * @param g parameter to draw on this JPanel
+     */
     @Override
     public void paintComponent(Graphics g) {
         super.paintComponent(g);
         Graphics2D g2d = (Graphics2D) g;
         drawBoard(g2d);
-        System.out.println("koloruje panel");
         g2d.dispose();
     }
     /**
@@ -55,7 +57,11 @@ public class GameJPanel extends javax.swing.JPanel {
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     // End of variables declaration//GEN-END:variables
-
+    /**
+     * Draw Board to play Tic Tac Toe
+     * @param g2d parameter to draw 
+     * 2D graphic on this JPanel
+     */
     private void drawBoard(Graphics2D g2d) {
         g2d.setColor(Color.BLACK);
         double width = getWidth(), height = getHeight();
