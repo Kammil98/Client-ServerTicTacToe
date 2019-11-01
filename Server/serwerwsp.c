@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/socket.h>
@@ -22,28 +23,27 @@
 #define QUEUE_SIZE 5 // this is ignored anyway
 #define END_OF_MSG '-'
 
-struct ipcid
-{
+
+//structure to keep all ipcs id
+struct ipcid{
   int semid;
   int shmid;
   int msgid;
 };
-//struktura zawierająca dane, które zostaną przekazane do wątku
-struct thread_data_t
-{
-  int conn_sct_dsc;
-  int tab[3];
+
+//structure to keep date which we want to send to thread
+struct thread_data_t{
+  int conn_sct_dsc[2];
   struct ipcid ipcid;
 };
 
+static struct sembuf buf;
+
 //structure for message
-struct msgbuf
-{
+struct msgbuf{
   long mtype;
   int conn_sct_dsc;
 };
-
-static struct sembuf buf2;
 
 //structure for semaphore
 struct buf_elem {
@@ -58,11 +58,11 @@ semnum - number of semaphore in semaphore table
 semoper - amount of unlocked space
 */
 void mutex_unlock(int semid, int semnum, int semoper){
-    buf2.sem_num = semnum;
-    buf2.sem_op = semoper;
-    buf2.sem_flg = 0;
-    if (semop(semid, &buf2, 1) == -1){
-        perror("Podnoszenie semafora");
+    buf.sem_num = semnum;
+    buf.sem_op = semoper;
+    buf.sem_flg = 0;
+    if (semop(semid, &buf, 1) == -1){
+        perror("Błąd przy próbie podnoszenia semafora");
         exit(1);
     }
 }
@@ -74,11 +74,11 @@ semnum - number of semaphore in semaphore table
 semoper - amount of locked space
 */
 void mutex_lock(int semid, int semnum, int semoper){
-    buf2.sem_num = semnum;
-    buf2.sem_op = -1 * semoper;
-    buf2.sem_flg = 0;
-    if (semop(semid, &buf2, 1) == -1){
-    perror("Opuszczenie semafora");
+    buf.sem_num = semnum;
+    buf.sem_op = -1 * semoper;
+    buf.sem_flg = 0;
+    if (semop(semid, &buf, 1) == -1){
+    perror("Błąd przy próbie opuszczenia semafora");
     printf("%d\n", semid);
         exit(1);
     }
@@ -215,7 +215,7 @@ void handleConnection(int conn_sct_dsc) {
   pthread_t thread1;
 
   struct thread_data_t t_data;
-  t_data.conn_sct_dsc = conn_sct_dsc;
+  //t_data.conn_sct_dsc = conn_sct_dsc;
   //for(int i=0;i<3;i++)
   //  t_data.tab[i]=tab[i];
   //dane, które zostaną przekazane do wątku
@@ -226,7 +226,7 @@ void handleConnection(int conn_sct_dsc) {
   create_result = pthread_create(&thread1, NULL, ThreadBehavior, (void *)&t_data);
   if (create_result){
      printf("Błąd przy próbie utworzenia wątku, kod błędu: %d\n", create_result);
-     exit(-1);
+     exit(1);
   }
 /*  while(1)
   {
@@ -248,6 +248,38 @@ void handleConnection(int conn_sct_dsc) {
 
 
 /*
+Check moves of clients and send them information,
+do they can make such a move and do someone won
+At the end of the game send conn_sct_dsc to Queue
+if client want to play again
+*/
+void *StartGame(void *t_data){
+  printf("Tworze nowa gre.\n");
+  fflush(stdout);
+  if(pthread_detach(pthread_self()) != 0){
+    perror("Błąd przy próbie odłączenia wątku StartGame od wątku macierzystego.\n");
+    exit(-1);
+  }
+  struct thread_data_t th_data = *((struct thread_data_t*)t_data);
+  free(t_data);
+  char *tab[9];
+  for(int i =0; i<9; i++)
+    tab[i] = "-";
+  char *sign[2];
+  sign[0] = "x";
+  sign[1] = "o";
+  bool won = false;
+  write(th_data.conn_sct_dsc[0], sign[0],sizeof(sign[0]));
+  write(th_data.conn_sct_dsc[1], sign[1],sizeof(sign[1]));
+  while(!won)
+  {
+
+  }
+  pthread_exit(NULL);
+}
+
+
+/*
 Match Clients in pairs to play game
 take conn_sct_dsc when any arrive in Queue
 */
@@ -256,9 +288,12 @@ void *matchClients(void *t_data) {
     perror("Błąd przy próbie odłączenia wątku matchClients od wątku macierzystego.\n");
     exit(-1);
   }
+  struct thread_data_t *gameData;
   struct thread_data_t th_data = *((struct thread_data_t*)t_data);
+  free(t_data);
   int clients_dsc[2], i = 0;
-  int msgSucces;
+  int msgSucces, create_result;
+  pthread_t thread;
   struct msgbuf receiver;
 
   while(1)
@@ -278,9 +313,15 @@ void *matchClients(void *t_data) {
     }
     if(i == 2){
       i = 0;
-      printf("Tworze nowa gre.\n");
-      fflush(stdout);
-      //startGame(clients_dsc);
+      gameData = (struct thread_data_t *)malloc(sizeof(struct thread_data_t));
+      (*gameData).conn_sct_dsc[0] = clients_dsc[0];
+      (*gameData).conn_sct_dsc[1] = clients_dsc[1];
+      (*gameData).ipcid = th_data.ipcid;
+      create_result = pthread_create(&thread, NULL, StartGame, (void *)gameData);
+      if (create_result){
+         printf("Błąd przy próbie utworzenia wątku dobierajacego w pary klientów, kod błędu: %d\n", create_result);
+         exit(-1);
+      }
     }
   }
   pthread_exit(NULL);
@@ -294,15 +335,14 @@ function
 void wakeUpMatchClients(struct ipcid ipcid){
   //uchwyt na wątek
   pthread_t thread1;
-  struct thread_data_t t_data;
-  t_data.ipcid.msgid = ipcid.msgid;
-  t_data.ipcid.semid = ipcid.semid;
-  int create_result = pthread_create(&thread1, NULL, matchClients, (void *)&t_data);
+  struct thread_data_t *t_data = (struct thread_data_t *)malloc(sizeof(struct thread_data_t));
+  (*t_data).ipcid = ipcid;
+  int create_result = pthread_create(&thread1, NULL, matchClients, (void *)t_data);
   if (create_result){
      printf("Błąd przy próbie utworzenia wątku dobierajacego w pary klientów, kod błędu: %d\n", create_result);
-     exit(-1);
+     releaseIPC(ipcid);
+     exit(1);
   }
-  sleep(1);//wait a second to allow matchClients to save sent data
 }
 
 
@@ -317,12 +357,12 @@ void acceptClients(int server_sct_dsc, struct ipcid ipcid){
   int conn_sct_dsc = -1;
 
   conn_sct_dsc = accept(server_sct_dsc, NULL, NULL);
-  printf("połączono\n");
+  printf("Połączono klienta\n");
   if (conn_sct_dsc < 0)
   {
      fprintf(stderr, "Błąd przy próbie utworzenia gniazda dla połączenia.\n");
      close(server_sct_dsc);
-     //releaseIPC(semid, shmid, msgid);
+     releaseIPC(ipcid);
      exit(1);
   }
   sender.conn_sct_dsc = conn_sct_dsc;
@@ -332,7 +372,7 @@ void acceptClients(int server_sct_dsc, struct ipcid ipcid){
     printf("Argumenty msgid=%d\nsender.conn_sct_dsc=%d\n", ipcid.msgid, sender.conn_sct_dsc);
     perror("Błąd przy próbie wysłania komunikatu");
     close(server_sct_dsc);
-    //releaseIPC(semid, shmid, msgid);
+    releaseIPC(ipcid);
     exit(1);
   }
   else{
@@ -346,8 +386,6 @@ int main(int argc, char* argv[])
   //int semid, shmid, msgid;
   struct ipcid ipcid;
    int server_sct_dsc;
-
-
    server_sct_dsc = prepare_socket(argv);
    createIPC(&ipcid);
    wakeUpMatchClients(ipcid);
