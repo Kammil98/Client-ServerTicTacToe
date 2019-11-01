@@ -22,15 +22,18 @@
 #define QUEUE_SIZE 5 // this is ignored anyway
 #define END_OF_MSG '-'
 
-
+struct ipcid
+{
+  int semid;
+  int shmid;
+  int msgid;
+};
 //struktura zawierająca dane, które zostaną przekazane do wątku
 struct thread_data_t
 {
   int conn_sct_dsc;
   int tab[3];
-  int semid;
-  int shmid;
-  int msgid;
+  struct ipcid ipcid;
 };
 
 //structure for message
@@ -86,32 +89,32 @@ void mutex_lock(int semid, int semnum, int semoper){
 semid - int sent to function to receive
 id of semaphores
 */
-void createIPC(int *semid, int *shmid, int *msgid){
+void createIPC(struct ipcid *ipcid){
 	//creating IPC objects
-  *semid = semget(KEY, MAX_GAMES, IPC_CREAT|0600);
-  if(*semid == -1){
+  (*ipcid).semid = semget(KEY, MAX_GAMES, IPC_CREAT|0600);
+  if((*ipcid).semid == -1){
     perror("Blad przy utworzeniu zbioru semaforow\n");
 		exit(1);
 	}
-  if(semctl( *semid, 0, SETVAL, 0) == -1){
+  if(semctl( (*ipcid).semid, 0, SETVAL, 0) == -1){
     perror("Nadanie wartosci semaforowi nr 0");
     exit(1);
   }
   for(int i = 1; i < MAX_GAMES; i++){
-    if(semctl( *semid, i, SETVAL, 1) == -1){
+    if(semctl( (*ipcid).semid, i, SETVAL, 1) == -1){
   		perror("Nadanie wartosci semaforowi nr " + i);
   		exit(1);
   	}
   }
   //shared memory keep conn_sct for all clients, who wait for game
-  *shmid = shmget(KEY, (MAX_GAMES * 2 + 1) *sizeof(int), IPC_CREAT|0600);
+  (*ipcid).shmid = shmget(KEY, (MAX_GAMES * 2 + 1) *sizeof(int), IPC_CREAT|0600);
 
-  if(*shmid == -1){
+  if((*ipcid).shmid == -1){
         perror("Blad przy utworzeniu pamięci współdzielonej \nByć może taki klucz juz istnieje dla pamieci wspoldzielonej\n");
   }
   //msg Queue keep conn_sct for all clients, who wait for game
-  *msgid = msgget(KEY, IPC_CREAT|0600);
-  if(*msgid == -1){
+  (*ipcid).msgid = msgget(KEY, IPC_CREAT|0600);
+  if((*ipcid).msgid == -1){
     perror("Blad przy utworzeniu kolejki komunikatów\n");
 		exit(1);
 	}
@@ -121,18 +124,18 @@ void createIPC(int *semid, int *shmid, int *msgid){
 /*
 release memory after end of process
 */
-void releaseIPC(int semid, int shmid, int msgid){
-  if (shmctl (semid, IPC_RMID, NULL) < 0)
+void releaseIPC(struct ipcid ipcid){
+  if (shmctl (ipcid.semid, IPC_RMID, NULL) < 0)
   {
     perror("Blad przy zwolnieniu zbioru semaforów");
     exit (-1);
   }
-  if (shmctl (shmid, IPC_RMID, NULL) < 0)
+  if (shmctl (ipcid.shmid, IPC_RMID, NULL) < 0)
   {
     perror("Blad przy zwolnieniu pamięci współdzielonej");
     exit (-1);
   }
-  if (shmctl (msgid, IPC_RMID, NULL) < 0)
+  if (shmctl (ipcid.msgid, IPC_RMID, NULL) < 0)
   {
     perror("Blad przy zwolnieniu kolejki komunikatów");
     exit (-1);
@@ -245,8 +248,8 @@ void handleConnection(int conn_sct_dsc) {
 
 
 /*
-Match Clients in pairs
-to play game
+Match Clients in pairs to play game
+take conn_sct_dsc when any arrive in Queue
 */
 void *matchClients(void *t_data) {
   if(pthread_detach(pthread_self()) != 0){
@@ -260,12 +263,12 @@ void *matchClients(void *t_data) {
 
   while(1)
   {
-    mutex_lock(th_data.semid, 0, 1);
+    mutex_lock(th_data.ipcid.semid, 0, 1);
     //receive msg of any type( 4 argument == 0 mean any type of msg)
-    msgSucces = msgrcv(th_data.msgid, &receiver, sizeof(receiver.conn_sct_dsc), 0, 0);
+    msgSucces = msgrcv(th_data.ipcid.msgid, &receiver, sizeof(receiver.conn_sct_dsc), 0, 0);
     if(msgSucces < 0){
       perror("Błąd przy próbie odebrania deskryptora połączenia z kolejki w wątku matchClients.\n");
-      printf("Argumenty msgid=%d\nsender.conn_sct_dsc=%d\n", th_data.msgid, receiver.conn_sct_dsc);
+      printf("Argumenty msgid=%d\nsender.conn_sct_dsc=%d\n", th_data.ipcid.msgid, receiver.conn_sct_dsc);
     }
     else{
       clients_dsc[i] = receiver.conn_sct_dsc;
@@ -288,14 +291,12 @@ void *matchClients(void *t_data) {
 Create thread with matchClients
 function
 */
-void wakeUpMatchClients(int semid, int msgid){
-  printf("%d\n", semid);
+void wakeUpMatchClients(struct ipcid ipcid){
   //uchwyt na wątek
   pthread_t thread1;
   struct thread_data_t t_data;
-  t_data.msgid = msgid;
-  t_data.semid = semid;
-  printf("t_data.semid = %d\n", t_data.semid);
+  t_data.ipcid.msgid = ipcid.msgid;
+  t_data.ipcid.semid = ipcid.semid;
   int create_result = pthread_create(&thread1, NULL, matchClients, (void *)&t_data);
   if (create_result){
      printf("Błąd przy próbie utworzenia wątku dobierajacego w pary klientów, kod błędu: %d\n", create_result);
@@ -305,7 +306,11 @@ void wakeUpMatchClients(int semid, int msgid){
 }
 
 
-void acceptClients(int server_sct_dsc, int semid, int msgid){
+/*
+accpt Client when someone want to connect
+and send his conn_sct_dsc to Queue
+*/
+void acceptClients(int server_sct_dsc, struct ipcid ipcid){
   struct msgbuf sender;
   sender.mtype = 1;
   int msgSucces;
@@ -322,36 +327,35 @@ void acceptClients(int server_sct_dsc, int semid, int msgid){
   }
   sender.conn_sct_dsc = conn_sct_dsc;
 
-  msgSucces = msgsnd(msgid, &sender, sizeof(sender.conn_sct_dsc), 0);
+  msgSucces = msgsnd(ipcid.msgid, &sender, sizeof(sender.conn_sct_dsc), 0);
   if ( msgSucces == -1){
-    printf("Argumenty msgid=%d\nsender.conn_sct_dsc=%d\n", msgid, sender.conn_sct_dsc);
+    printf("Argumenty msgid=%d\nsender.conn_sct_dsc=%d\n", ipcid.msgid, sender.conn_sct_dsc);
     perror("Błąd przy próbie wysłania komunikatu");
     close(server_sct_dsc);
     //releaseIPC(semid, shmid, msgid);
     exit(1);
   }
   else{
-    mutex_unlock(semid, 0, 1);//allow matchClients function to take message
+    mutex_unlock(ipcid.semid, 0, 1);//allow matchClients function to take message
   }
 }
 
 
 int main(int argc, char* argv[])
 {
-  int semid, shmid, msgid;
-
+  //int semid, shmid, msgid;
+  struct ipcid ipcid;
    int server_sct_dsc;
 
 
    server_sct_dsc = prepare_socket(argv);
-   createIPC(&semid, &shmid, &msgid);
-   printf("%d\n", semid);
-   wakeUpMatchClients(semid, msgid);
+   createIPC(&ipcid);
+   wakeUpMatchClients(ipcid);
    while(1)
    {
-    acceptClients(server_sct_dsc, semid, msgid);
+    acceptClients(server_sct_dsc, ipcid);
   }
-  releaseIPC(semid, shmid, msgid);
+  releaseIPC(ipcid);
    close(server_sct_dsc);
    return(0);
 }
