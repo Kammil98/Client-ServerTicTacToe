@@ -5,6 +5,7 @@
  */
 package window;
 
+import clienttictactoe.Game;
 import java.awt.BorderLayout;
 import javax.swing.JPanel;
 
@@ -16,7 +17,7 @@ public class MainWindowFrame extends javax.swing.JFrame {
     
     private JPanel activePanel;
     private final AnimationDrawer drawer;
-    
+    private Game game;
     
     /**
      * Creates new form MainWindowFrame
@@ -33,6 +34,7 @@ public class MainWindowFrame extends javax.swing.JFrame {
         setSize(500, 400);
         setResizable(false);
         drawer = new AnimationDrawer(getActivePanel(), 40);
+        game = new Game((GameJPanel)activePanel, 40);
     }
 
     /**

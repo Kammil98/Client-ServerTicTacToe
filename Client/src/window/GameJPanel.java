@@ -17,10 +17,17 @@ import java.awt.geom.Rectangle2D;
 public class GameJPanel extends javax.swing.JPanel {
 
     /**
+     * table with places where draw x and o
+     */
+    private char[] board;
+    /**
      * Creates new form GameJPanel
      */
     public GameJPanel() {
         initComponents();
+        board = new char[9];
+        for(int i = 0; i < 9; i++)
+            board[i] = '-';
     }
     /**
      * Paint whole graphic from this JPanel
@@ -87,5 +94,19 @@ public class GameJPanel extends javax.swing.JPanel {
                 2 * fieldWidth, 
                 height - lineShortage * 2, 
                 lineWidth));
+    }
+
+    /**
+     * @param board the board to set
+     */
+    public void setBoard(char[] board) {
+        this.board = board;
+    }
+    /**
+     * @param sign sign on board to set
+     * @param place place on baord to set sign in range <0, 8>
+     */
+    public void setSign(char sign, int place) {
+        this.board[place] = sign;
     }
 }
