@@ -8,6 +8,9 @@ package window;
 import java.awt.Color;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Point;
+import java.awt.geom.Ellipse2D;
+import java.awt.geom.Line2D;
 import java.awt.geom.Rectangle2D;
 
 /**
@@ -94,14 +97,76 @@ public class GameJPanel extends javax.swing.JPanel {
                 2 * fieldWidth, 
                 height - lineShortage * 2, 
                 lineWidth));
+        drawSigns(g2d);
     }
-
+    
+    
+    /**
+     * Draw signs on board
+     * @param g2d graphic on this JPanel
+     */
+    private void drawSigns(Graphics2D g2d){
+        Point p;
+        int fieldWidth = getWidth() / 4, 
+                lineShortage = (getHeight() + getWidth()) / 100;
+        int firstFieldCenter = lineShortage + fieldWidth / 2 - 5; // -5 because board lines have 5 pixels width
+        for(int i = 0; i < 9; i++){
+            p = new Point( firstFieldCenter + fieldWidth * (i % 3), firstFieldCenter + fieldWidth * (i / 3));
+            switch(board[i]){
+                case 'o':
+                    drawO(g2d, p);
+                    break;
+                case 'x':
+                    drawX(g2d, p);
+                    break;
+            }
+        }
+    }
+    
+    
+    /**
+     * Draw x sign at given point
+     * @param g2d graphic on this JPanel
+     * @param p center of cross
+     */
+    private void drawX(Graphics2D g2d, Point p){
+        double width = 100, height = 100;
+        g2d.draw(new Line2D.Double(
+                p.getX() - width / 2, 
+                p.getY() - height / 2, 
+                p.getX() + width / 2, 
+                p.getY() + height / 2));
+        g2d.draw(new Line2D.Double(
+                p.getX() + width / 2, 
+                p.getY() - height / 2, 
+                p.getX() - width / 2, 
+                p.getY() + height / 2));
+    }
+    
+    
+    /**
+     * Draw x sign at given point
+     * @param g2d graphic on this JPanel
+     * @param p center of circle
+     */
+    private void drawO(Graphics2D g2d, Point p){
+        double width = 100, height = 100;
+        g2d.draw(new Ellipse2D.Double(
+                p.getX() - width / 2, 
+                p.getY() - height / 2, 
+                width, 
+                height));
+    }
+    
+    
     /**
      * @param board the board to set
      */
     public void setBoard(char[] board) {
         this.board = board;
     }
+    
+    
     /**
      * @param sign sign on board to set
      * @param place place on baord to set sign in range <0, 8>
