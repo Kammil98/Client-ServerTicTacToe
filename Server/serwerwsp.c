@@ -248,6 +248,55 @@ void handleConnection(int conn_sct_dsc) {
 
 
 /*
+search messages from previous call of read which were not handled
+return true if msg is full or false if newMsg is not full
+*/
+bool searchLastMsgs(char *newMsg, char *lastMsg){
+  char* eofIndex;
+  if(strlen(lastMsg) > 0){//if there is messages from last read
+    eofIndex = strchr(lastMsg, '\n');
+    if(eofIndex == NULL){// if whole last messages is part of one message
+      strcat(newMsg, lastMsg);
+      strcpy(lastMsg, "");
+      return false;
+    }
+    else{//found whole message from last read
+      *eofIndex = '\0';
+      strcat(newMsg, lastMsg);
+      strcpy(lastMsg, eofIndex + sizeof(char));
+      return true;
+    }
+  }
+  return false;
+}
+
+
+/*
+Read messages received from Client
+lastMsg - keep last message, wchich wasn't handled
+newMsg -- will receive next message
+*/
+void readMsg(int conn_sct_dsc, char* newMsg, char* lastMsg, char* buffer){
+  int count;
+  if(searchLastMsgs(newMsg, lastMsg)){
+    return;
+  }
+  count = read(conn_sct_dsc, buffer, sizeof(char) * 10);
+  if(count < 0){
+    fprintf(stderr, "Błąd przy próbie Odczytania danych od Klienta o deskryptorze %d.\n", conn_sct_dsc);
+    exit(-1);
+  }
+  else{
+    strcpy(lastMsg, buffer);
+    if(searchLastMsgs(newMsg, lastMsg))
+      return;
+    strcpy(lastMsg, newMsg);
+    strcpy(newMsg, "");
+  }
+}
+
+
+/*
 Check moves of clients and send them information,
 do they can make such a move and do someone won
 At the end of the game send conn_sct_dsc to Queue
@@ -262,18 +311,35 @@ void *StartGame(void *t_data){
   }
   struct thread_data_t th_data = *((struct thread_data_t*)t_data);
   free(t_data);
-  char *tab[9];
-  for(int i =0; i<9; i++)
-    tab[i] = "-";
-  char *sign[2];
-  sign[0] = "x";
-  sign[1] = "o";
+  char tab[9];
+  memset(tab, '-', sizeof(char) * 9);
+  char sign[2][3];
+  for(int i = 0; i < 2; i++){
+      sign[i][0] = 'x';
+      if(i == 0)
+        sign[i][1] = 'o';
+      else
+        sign[i][1] = 'x';
+      sign[i][2] = '\n';
+    }
+  char buffer[11];
+  char newMsg[11];
+  char last[11];
+  char lastMsg[2][11];
+  memset(lastMsg[0], '\0', sizeof(char) * 11);
+  memset(lastMsg[1], '\0', sizeof(char) * 11);
   bool won = false;
-  write(th_data.conn_sct_dsc[0], sign[0],sizeof(sign[0]));
-  write(th_data.conn_sct_dsc[1], sign[1],sizeof(sign[1]));
+  int ile = write(th_data.conn_sct_dsc[0], sign[0], sizeof(char) * 3);
+  write(th_data.conn_sct_dsc[1], sign[1], sizeof(char) * 3);
   while(!won)
   {
-
+      memset(buffer, '\0', sizeof(char) * 11);
+      memset(newMsg, '\0', sizeof(char) * 11);
+      readMsg(th_data.conn_sct_dsc[1], newMsg, lastMsg[1], buffer);
+      printf("wiadomość = %s\n", newMsg);
+      printf("pozostało = %s\n", last);
+      fflush(stdout);
+      sleep(2);
   }
   pthread_exit(NULL);
 }
@@ -357,7 +423,6 @@ void acceptClients(int server_sct_dsc, struct ipcid ipcid){
   int conn_sct_dsc = -1;
 
   conn_sct_dsc = accept(server_sct_dsc, NULL, NULL);
-  printf("Połączono klienta\n");
   if (conn_sct_dsc < 0)
   {
      fprintf(stderr, "Błąd przy próbie utworzenia gniazda dla połączenia.\n");
@@ -383,7 +448,6 @@ void acceptClients(int server_sct_dsc, struct ipcid ipcid){
 
 int main(int argc, char* argv[])
 {
-  //int semid, shmid, msgid;
   struct ipcid ipcid;
    int server_sct_dsc;
    server_sct_dsc = prepare_socket(argv);
