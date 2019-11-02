@@ -27,8 +27,6 @@ public class ServerConnetioner {
     
     private static int port;
     private static Socket socket;
-    private static BufferedWriter bw;
-    private static BufferedReader br;
     /**
      * Initializer ServerConnetioner class
      * @param port number of port to connect with server
@@ -61,31 +59,28 @@ public class ServerConnetioner {
      * @param IPaddr server IP
      */
     public ServerConnetioner(int port, String IPaddr){
-            this.port = port;
-            OutputStream os = null;
-            InputStream is = null;
+            ServerConnetioner.port = port;
             InetAddress addr = null;
             socket = null;
             try {
                 socket = new Socket("localhost", port);
                 addr = socket.getInetAddress();
-                os = socket.getOutputStream();
-                is = socket.getInputStream();
             } catch (IOException ex) {
             Logger.getLogger(ServerConnetioner.class.getName()).log(Level.SEVERE, null, ex);
             }
-            bw = new BufferedWriter(new OutputStreamWriter(os));
-            br = new BufferedReader(new InputStreamReader(is));
             System.out.println("Connected to " + addr);
-            
     }
     
     /**
      * @return next msg or nul if eof is reached
      */
     public static String readMsg(){
+        InputStream is;
+        BufferedReader br;
         String msg = null;
         try {
+            is = socket.getInputStream();
+            br = new BufferedReader(new InputStreamReader(is));
             msg = br.readLine();
         } catch (IOException ex) {
             Logger.getLogger(ServerConnetioner.class.getName()).log(Level.SEVERE, null, ex);
@@ -93,7 +88,11 @@ public class ServerConnetioner {
         return msg;
     }
     public static void writeMsg(String msg){
+        OutputStream os;
+        BufferedWriter bw;
         try {
+            os = socket.getOutputStream();
+            bw = new BufferedWriter(new OutputStreamWriter(os));
             bw.write(msg);
             bw.flush();
         } catch (IOException ex) {
@@ -106,8 +105,7 @@ public class ServerConnetioner {
      */
     public static void closeConnection(){
         try {
-            br.close();
-            bw.close();
+            System.out.println("Zamykam połączenie");
             socket.close();
         } catch (IOException ex) {
             Logger.getLogger(ServerConnetioner.class.getName()).log(Level.SEVERE, null, ex);
