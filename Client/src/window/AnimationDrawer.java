@@ -15,6 +15,12 @@ import javax.swing.Timer;
  * @author kamil
  */
 public class AnimationDrawer implements ActionListener{
+
+    /**
+     * Initializer of AnimationDrawer class
+     * @param panel JPanel to draw on
+     * @param FPS Frames per Second
+     */
     public AnimationDrawer(JPanel panel, int FPS){
         this.FPS = FPS;
         this.panel = panel;
@@ -48,5 +54,20 @@ public class AnimationDrawer implements ActionListener{
      */
     public void setPanel(JPanel panel) {
         this.panel = panel;
+    }
+
+    /**
+     * @return the FPS
+     */
+    public int getFPS() {
+        return FPS;
+    }
+
+    /**
+     * @param FPS the FPS to set
+     */
+    public void setFPS(int FPS) {
+        this.FPS = FPS;
+        timer.setDelay(1000 / FPS);
     }
 }
