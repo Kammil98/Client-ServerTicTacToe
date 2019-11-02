@@ -5,11 +5,6 @@
  */
 package clienttictactoe;
 
-import static java.lang.Thread.sleep;
-import java.net.InetAddress;
-import java.net.Socket;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import window.MainWindowFrame;
 
 /**
@@ -28,7 +23,6 @@ public class ClientTicTacToe {
     public static void main(String[] args) {
         ServerConnetioner conn = new ServerConnetioner(1235, "localhost");
         MainWindowFrame.main(args);
-        ServerConnetioner.closeConnection();
     }
     
 }
