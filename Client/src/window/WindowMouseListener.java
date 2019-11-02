@@ -5,6 +5,8 @@
  */
 package window;
 
+import clienttictactoe.Game;
+import clienttictactoe.ServerConnetioner;
 import java.awt.Point;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
@@ -62,11 +64,13 @@ public class WindowMouseListener implements MouseListener{
         if(frame.getActivePanel().getClass() == GameJPanel.class){
             fieldClicked = findField(e);
         }
-        
-        
-        //send to server place where we want to move
-        
-        //receive answer and eventually draw
+        if(Game.getSign() == Game.getTurn()){
+            /*char msg[] = new char[2];
+            msg[0] = (char)fieldClicked;
+            msg[1] = '\n';*/
+            String msg = String.valueOf(fieldWidth) + '\n';
+            ServerConnetioner.writeMsg(msg);
+        }
     }
     
     

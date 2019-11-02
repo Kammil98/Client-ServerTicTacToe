@@ -15,11 +15,11 @@ import window.GameJPanel;
  * @author kamil
  */
 public class Game  implements ActionListener{
-    
+
     private final Timer timer;
     private final GameJPanel panel;
-    private final char turn;
-    private final char sign;
+    private static char turn;
+    private static char sign;
     /**
      * Connections per second with server
      */
@@ -32,6 +32,8 @@ public class Game  implements ActionListener{
             board[i] = '-';
         panel.setBoard(board);
     }
+    
+    
     /**
      * Initializer of Game class
      * @param panel JPanel to draw on
@@ -43,20 +45,43 @@ public class Game  implements ActionListener{
         String msg = null;
         while(msg == null)
             msg = ServerConnetioner.readMsg();
-        this.turn = msg.charAt(0);
-        this.sign = msg.charAt(1);
+        Game.turn = msg.charAt(0);
+        Game.sign = msg.charAt(1);
         clearBoard();
-        System.out.println("Initialized game.\n" + this.turn + " starts.\nYour sign is " + this.sign);
+        System.out.println("Initialized game.\n" + Game.turn + " starts.\nYour sign is " + Game.sign);
         timer = new Timer(1000 / CPS, this);
         timer.setInitialDelay(0);
         timer.start();
     }
-
+    
+    
+    private void handleReceivedMsg(String msg){
+        if(msg == null)
+            return;
+        switch(msg.charAt(0)){
+            case 't'://change turn
+                turn = msg.charAt(1);
+                break;
+            case 's'://set sign on postion
+                panel.setSign(msg.charAt(1), (int)msg.charAt(1));
+                break;
+            case 'w'://someone won
+                break;
+        }
+    }
+    
+    
+    /**
+     * Read messages from server and handle them
+     * @param e event
+     */
     @Override
     public void actionPerformed(ActionEvent e) {
-        
+        String msg = ServerConnetioner.readMsg();
+        handleReceivedMsg(msg);
     }
 
+    
     /**
      * @return the CPS
      */
@@ -64,6 +89,7 @@ public class Game  implements ActionListener{
         return CPS;
     }
 
+    
     /**
      * @param CPS CPS to set
      */
@@ -71,4 +97,21 @@ public class Game  implements ActionListener{
         this.CPS = CPS;
         timer.setDelay(1000 / CPS);
     }
+    
+    
+    /**
+     * @return the turn
+     */
+    public static char getTurn() {
+        return turn;
+    }
+
+    
+    /**
+     * @return the sign
+     */
+    public static char getSign() {
+        return sign;
+    }
+    
 }
