@@ -38,7 +38,7 @@ public class WindowMouseListener implements MouseListener{
      */
     private int findField(MouseEvent e){
         int place;
-        Point p = e.getLocationOnScreen();
+        Point p = new Point(e.getX(), e.getY());
         // +5 and -25 because JPanel do not start at pixel (0,0) there is menubar 
         // and a small invisible place of JFrame otside the visible part 
         double width = p.getX() + 5 , height = p.getY() - 25;
@@ -64,11 +64,11 @@ public class WindowMouseListener implements MouseListener{
         if(frame.getActivePanel().getClass() == GameJPanel.class){
             fieldClicked = findField(e);
         }
-        if(Game.getSign() == Game.getTurn()){
+        if(Game.getSign() == Game.getTurn() && fieldClicked != -1){
             /*char msg[] = new char[2];
             msg[0] = (char)fieldClicked;
             msg[1] = '\n';*/
-            String msg = String.valueOf(fieldWidth) + '\n';
+            String msg = String.valueOf(fieldClicked) + '\n';
             ServerConnetioner.writeMsg(msg);
         }
     }

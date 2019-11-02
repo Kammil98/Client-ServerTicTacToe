@@ -278,21 +278,91 @@ newMsg -- will receive next message
 */
 void readMsg(int conn_sct_dsc, char* newMsg, char* lastMsg, char* buffer){
   int count;
+  memset(buffer, '\0', sizeof(char) * 11);
+  memset(newMsg, '\0', sizeof(char) * 11);
   if(searchLastMsgs(newMsg, lastMsg)){
     return;
   }
   count = read(conn_sct_dsc, buffer, sizeof(char) * 10);
+  printf("1Odebrałem %s\n",  buffer);
   if(count < 0){
     fprintf(stderr, "Błąd przy próbie Odczytania danych od Klienta o deskryptorze %d.\n", conn_sct_dsc);
     exit(-1);
   }
+  if(count == 0){
+    printf("Klient zakończył grę\n");
+    fflush(stdout);
+    buffer[0] = 'e';//end
+  }
   else{
+
     strcpy(lastMsg, buffer);
     if(searchLastMsgs(newMsg, lastMsg))
       return;
     strcpy(lastMsg, newMsg);
     strcpy(newMsg, "");
   }
+}
+
+
+/*
+Write message to Client
+*/
+void writeMsg(int conn_sct_dsc, char* message, int size){
+  int count = 0;
+  int temp_count = 0;
+  while(count != size){
+    temp_count = write(conn_sct_dsc, &message[count], size - count * sizeof(char));
+    if(temp_count < 0){
+      fprintf(stderr, "Błąd przy próbie wysłania danych do klienta o deskryptorze %d.\n", conn_sct_dsc);
+      exit(-1);
+    }
+    count += temp_count;
+  }
+}
+
+
+/*
+Check if move is proper
+and send notyfication to Clients if it is proper
+*/
+bool checkMove(int conn_sct_dsc[], char sign, int field, char tab[]){
+char secondSign;
+  if(sign == 'x')
+    secondSign = 'o';
+  else
+    secondSign = 'x';
+  char msgToClient[2][11];
+  memset(msgToClient[0], '\0', sizeof(char) * 11);
+  memset(msgToClient[1], '\0', sizeof(char) * 11);
+  if(tab[field] == '-'){
+    tab[field] = sign;
+    //send notyfication about move
+    msgToClient[0][0] = msgToClient[1][0] = 's';
+    msgToClient[0][1] = msgToClient[1][1] = sign;
+    msgToClient[0][2] = msgToClient[1][2] = (char)field + '0';
+    msgToClient[0][3] = msgToClient[1][3] = '\n';
+    printf("Wysyłam %s\n",  msgToClient[0]);
+    fflush(stdout);
+    writeMsg(conn_sct_dsc[0], msgToClient[0], sizeof(char) * 4);
+    writeMsg(conn_sct_dsc[1], msgToClient[1], sizeof(char) * 4);
+
+    //send notyfication about change turn
+    msgToClient[0][0] = msgToClient[1][0] = 't';
+    msgToClient[0][1] = msgToClient[1][1] = secondSign;
+    msgToClient[0][2] = msgToClient[1][2] = '\n';
+    printf("Wysyłam %s\n",  msgToClient[0]);
+    fflush(stdout);
+    writeMsg(conn_sct_dsc[0], msgToClient[0], sizeof(char) * 3);
+    writeMsg(conn_sct_dsc[1], msgToClient[1], sizeof(char) * 3);
+    return true;
+  }
+  else{
+    printf("field = %d\ntab[field] = %c\n", field, tab[field]);
+    fflush(stdout);
+    sleep(1);
+  }
+  return false;
 }
 
 
@@ -311,35 +381,46 @@ void *StartGame(void *t_data){
   }
   struct thread_data_t th_data = *((struct thread_data_t*)t_data);
   free(t_data);
-  char tab[9];
+  char turn = 'x', msgToClient[2][11], tab[9];
+  char buffer[11], newMsg[11], lastMsg[2][11];
+  int field;
+  char won = 'n';
   memset(tab, '-', sizeof(char) * 9);
-  char sign[2][3];
-  for(int i = 0; i < 2; i++){
-      sign[i][0] = 'x';
-      if(i == 0)
-        sign[i][1] = 'o';
-      else
-        sign[i][1] = 'x';
-      sign[i][2] = '\n';
-    }
-  char buffer[11];
-  char newMsg[11];
-  char last[11];
-  char lastMsg[2][11];
   memset(lastMsg[0], '\0', sizeof(char) * 11);
   memset(lastMsg[1], '\0', sizeof(char) * 11);
-  bool won = false;
-  int ile = write(th_data.conn_sct_dsc[0], sign[0], sizeof(char) * 3);
-  write(th_data.conn_sct_dsc[1], sign[1], sizeof(char) * 3);
-  while(!won)
+  for(int i = 0; i < 2; i++){
+      msgToClient[i][0] = turn;
+      if(i == 0)
+        msgToClient[i][1] = 'o';
+      else
+        msgToClient[i][1] = 'x';
+      msgToClient[i][2] = '\n';
+    }
+  writeMsg(th_data.conn_sct_dsc[0], msgToClient[0], sizeof(char) * 3);
+  writeMsg(th_data.conn_sct_dsc[1], msgToClient[1], sizeof(char) * 3);
+  while(won == 'n')
   {
-      memset(buffer, '\0', sizeof(char) * 11);
-      memset(newMsg, '\0', sizeof(char) * 11);
+    do{
       readMsg(th_data.conn_sct_dsc[1], newMsg, lastMsg[1], buffer);
-      printf("wiadomość = %s\n", newMsg);
-      printf("pozostało = %s\n", last);
+      printf("Odebrałem %s\n", newMsg);
       fflush(stdout);
-      sleep(2);
+      if(newMsg[0] != 'e')
+        field = (int)newMsg[0] - (int)'0';
+      else
+        won = 'o';
+    }while(!checkMove(th_data.conn_sct_dsc, 'x', field, tab) && newMsg[0] != 'e');
+    do{
+      readMsg(th_data.conn_sct_dsc[0], newMsg, lastMsg[0], buffer);
+      if(newMsg[0] != 'e')
+        field = (int)newMsg[0] - (int)'0';
+        else
+          won = 'x' - (int)'0';
+    }while(!checkMove(th_data.conn_sct_dsc, 'o', field, tab) && newMsg[0] != 'e');
+
+    //printf("wiadomość = %s\n", newMsg);
+    //printf("pozostało = %s\n", lastMsg[1]);
+    //fflush(stdout);
+    sleep(2);
   }
   pthread_exit(NULL);
 }

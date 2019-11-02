@@ -58,12 +58,13 @@ public class Game  implements ActionListener{
     private void handleReceivedMsg(String msg){
         if(msg == null)
             return;
+        System.out.println(msg);
         switch(msg.charAt(0)){
             case 't'://change turn
                 turn = msg.charAt(1);
                 break;
             case 's'://set sign on postion
-                panel.setSign(msg.charAt(1), (int)msg.charAt(1));
+                panel.setSign(msg.charAt(1), msg.charAt(2) - '0');
                 break;
             case 'w'://someone won
                 break;
