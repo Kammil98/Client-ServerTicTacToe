@@ -22,7 +22,7 @@ public class MainWindowFrame extends javax.swing.JFrame {
     /**
      * Creates new form MainWindowFrame
      */
-    public MainWindowFrame() {
+    public MainWindowFrame(){
         super("Tic Tac Toe");
         initComponents();
         addMouseListener(new WindowMouseListener());
@@ -49,6 +49,11 @@ public class MainWindowFrame extends javax.swing.JFrame {
         getActivePanel().setVisible(true);
     }
     
+    
+    public void CloseWindow(){
+        setVisible(false);
+        dispose();
+    }
     
     /**
      * This method is called from within the constructor to initialize the form.

@@ -18,7 +18,7 @@
 #include <pthread.h>
 
 #define KEY 1234
-#define SERVER_PORT 1234
+#define SERVER_PORT 1235
 #define MAX_GAMES 100
 #define QUEUE_SIZE 5 // this is ignored anyway
 #define END_OF_MSG '-'
@@ -50,6 +50,9 @@ struct buf_elem {
    long mtype;
    int mvalue;
 };
+
+
+void *StartGame(void *t_data);
 
 
 /*
@@ -186,67 +189,6 @@ int prepare_socket(char* argv[]){
 }
 
 
-//funkcja opisującą zachowanie wątku - musi przyjmować argument typu (void *) i zwracać (void *)
-void *ThreadBehavior(void *t_data){
-  if(pthread_detach(pthread_self()) != 0){
-    perror("Błąd przy próbie odłączenia wątku ThreadBehavior od wątku macierzystego.\n");
-    exit(-1);
-  }
-  //struct thread_data_t *th_data = (struct thread_data_t*)t_data;
-  //dostęp do pól struktury: (*th_data).pole
-  //TODO (przy zadaniu 1) klawiatura -> wysyłanie albo odbieranie -> wyświetlanie
-  //int clients_dsc[2];
-  //int i = 0;
-  //char buf[100];
-  while(1)
-  {
-  }
-  pthread_exit(NULL);
-}
-
-
-//funkcja obsługująca połączenie z nowym klientem
-void handleConnection(int conn_sct_dsc) {
-  //wynik funkcji tworzącej wątek
-  int create_result = 0;
-  //char buf[100];
-
-  //uchwyt na wątek
-  pthread_t thread1;
-
-  struct thread_data_t t_data;
-  //t_data.conn_sct_dsc = conn_sct_dsc;
-  //for(int i=0;i<3;i++)
-  //  t_data.tab[i]=tab[i];
-  //dane, które zostaną przekazane do wątku
-  //TODO dynamiczne utworzenie instancji struktury thread_data_t o nazwie t_data (+ w odpowiednim miejscu zwolnienie pamięci)
-
-  //TODO wypełnienie pól struktury
-
-  create_result = pthread_create(&thread1, NULL, ThreadBehavior, (void *)&t_data);
-  if (create_result){
-     printf("Błąd przy próbie utworzenia wątku, kod błędu: %d\n", create_result);
-     exit(1);
-  }
-/*  while(1)
-  {
-    for(int i=0;i<3;i++){
-      for(int i=0;i<100;i++)
-      	buf[i]=' ';
-
-    read(tab[i],buf,sizeof(buf));
-    for(int j=0;j<3;j++){
-      if(i!=j)
-        write(t_data.tab[j],buf,sizeof(buf));}
-      printf("%p", &buf);
-      fflush(stdout);
-    }
-  }*/
-
-  //TODO (przy zadaniu 1) odbieranie -> wyświetlanie albo klawiatura -> wysyłanie
-}
-
-
 /*
 search messages from previous call of read which were not handled
 return true if msg is full or false if newMsg is not full
@@ -275,6 +217,10 @@ bool searchLastMsgs(char *newMsg, char *lastMsg){
 Read messages received from Client
 lastMsg - keep last message, wchich wasn't handled
 newMsg -- will receive next message
+Legend of messages:
+r - answer for replay: ry want replay rn end of connection
+0-8 - want to make move on this position
+e - client closed connection
 */
 void readMsg(int conn_sct_dsc, char* newMsg, char* lastMsg, char* buffer){
   int count;
@@ -284,7 +230,6 @@ void readMsg(int conn_sct_dsc, char* newMsg, char* lastMsg, char* buffer){
     return;
   }
   count = read(conn_sct_dsc, buffer, sizeof(char) * 10);
-  printf("1Odebrałem %s\n",  buffer);
   if(count < 0){
     fprintf(stderr, "Błąd przy próbie Odczytania danych od Klienta o deskryptorze %d.\n", conn_sct_dsc);
     exit(-1);
@@ -293,9 +238,9 @@ void readMsg(int conn_sct_dsc, char* newMsg, char* lastMsg, char* buffer){
     printf("Klient zakończył grę\n");
     fflush(stdout);
     buffer[0] = 'e';//end
+    buffer[1] = '\n';//end
   }
   else{
-
     strcpy(lastMsg, buffer);
     if(searchLastMsgs(newMsg, lastMsg))
       return;
@@ -325,37 +270,46 @@ void writeMsg(int conn_sct_dsc, char* message, int size){
 
 
 /*
+Send the same message to both players
+*/
+void sendToPlayers(int conn_sct_dsc[2], char msg[]){
+  int size = sizeof(char) * strlen(msg);
+  writeMsg(conn_sct_dsc[0], msg, size);
+  writeMsg(conn_sct_dsc[1], msg, size);
+}
+
+
+/*
 Check if move is proper
 and send notyfication to Clients if it is proper
 */
-bool checkMove(int conn_sct_dsc[], char *sign, int field, char tab[]){
+bool checkMove(int conn_sct_dscs[], char *sign, int field, char tab[]){
 char secondSign;
   if(*sign == 'x')
     secondSign = 'o';
   else
     secondSign = 'x';
-  char msgToClient[2][11];
-  memset(msgToClient[0], '\0', sizeof(char) * 11);
-  memset(msgToClient[1], '\0', sizeof(char) * 11);
+  char msg[11];
+  memset(msg, '\0', sizeof(char) * 11);
   if(tab[field] == '-'){
     tab[field] = *sign;
     //send notyfication about move
-    msgToClient[0][0] = msgToClient[1][0] = 's';
-    msgToClient[0][1] = msgToClient[1][1] = *sign;
-    msgToClient[0][2] = msgToClient[1][2] = (char)field + '0';
-    printf("Wysyłam %s\n",  msgToClient[0]);
+    msg[0] = 's';
+    msg[1] = *sign;
+    msg[2] = (char)field + '0';
+    msg[3] = '\0';
+    printf("Wysyłam %s\n",  msg);
     fflush(stdout);
-    writeMsg(conn_sct_dsc[0], msgToClient[0], sizeof(char) * 3);
-    writeMsg(conn_sct_dsc[1], msgToClient[1], sizeof(char) * 3);
+    sendToPlayers(conn_sct_dscs, msg);
 
     //send notyfication about change turn
     *sign = secondSign;
-    msgToClient[0][0] = msgToClient[1][0] = 't';
-    msgToClient[0][1] = msgToClient[1][1] = *sign;
-    printf("Wysyłam %s\n",  msgToClient[0]);
+    msg[0] = 't';
+    msg[1] = *sign;
+    msg[2] = '\0';
+    printf("Wysyłam %s\n",  msg);
     fflush(stdout);
-    writeMsg(conn_sct_dsc[0], msgToClient[0], sizeof(char) * 2);
-    writeMsg(conn_sct_dsc[1], msgToClient[1], sizeof(char) * 2);
+    sendToPlayers(conn_sct_dscs, msg);
     return true;
   }
   else{
@@ -374,32 +328,17 @@ or 'd' if there is a draw
 */
 char checkWinCondition(char tab[]){
   for(int i = 0; i <3; i++){
-    if(tab[i] != '-' && tab[i] == tab[i + 3] && tab[i + 3] == tab[i + 6]){//vertical line
-      printf("Mam1 i=%d", i);
-      fflush(stdout);
+    if(tab[i] != '-' && tab[i] == tab[i + 3] && tab[i + 3] == tab[i + 6])//vertical line
       return tab[i];
-    }
-    if(tab[i * 3] != '-' && tab[i * 3] == tab[i * 3 + 1] && tab[i * 3 + 1] == tab[i * 3 + 2]){//horizontal line
-      printf("Mam2 i=%d", i);
-      fflush(stdout);
+    if(tab[i * 3] != '-' && tab[i * 3] == tab[i * 3 + 1] && tab[i * 3 + 1] == tab[i * 3 + 2])//horizontal line
       return tab[i * 3];
-    }
   }
-  if(tab[0] != '-' && tab[0] == tab[4] && tab[4] == tab[8]){
-    printf("Mam3 tab[0]=%d", tab[0]);
-    fflush(stdout);
+  if(tab[0] != '-' && tab[0] == tab[4] && tab[4] == tab[8])
     return tab[0];
-  }
-
-  if(tab[2] != '-' && tab[2] == tab[4] && tab[4] == tab[6]){
-    printf("Mam4 tab[2]=%d", tab[2]);
-    fflush(stdout);
+  if(tab[2] != '-' && tab[2] == tab[4] && tab[4] == tab[6])
     return tab[2];
-  }
   for(int i = 0; i <9; i++){
     if(tab[i] == '-'){
-      printf("Mam5 i=%d", i);
-      fflush(stdout);
       return 'n';
     }
   }
@@ -408,12 +347,80 @@ char checkWinCondition(char tab[]){
 
 
 /*
+Create new pthread for Game
+*/
+void createGameThread(struct thread_data_t t_data){
+  struct ipcid ipcid;
+  ipcid = t_data.ipcid;
+  pthread_t thread;
+  struct thread_data_t *gameData;
+  int create_result;
+  gameData = (struct thread_data_t *)malloc(sizeof(struct thread_data_t));
+  (*gameData).conn_sct_dsc[0] = t_data.conn_sct_dsc[0];
+  (*gameData).conn_sct_dsc[1] = t_data.conn_sct_dsc[1];
+  (*gameData).ipcid = ipcid;
+  create_result = pthread_create(&thread, NULL, StartGame, (void *)gameData);
+  if (create_result){
+     printf("Błąd przy próbie utworzenia wątku dobierajacego w pary klientów, kod błędu: %d\n", create_result);
+     exit(-1);
+  }
+}
+
+
+/*
+Send clients message who is the winner
+Ask them for replay and create next game
+if both want replay.
+If only one want reply, then send him to Queue
+of waiting players
+*/
+void endGame(struct thread_data_t th_data, char won, char lastMsg[2][11]){
+  char msg[2][11];
+  char buffer[11];
+  memset(buffer, '\0', sizeof(char) * 11);
+  //send winner and set, that it is noone turn
+  strcpy(msg[0], "tn");
+  printf("Wysyłam %s\n",  msg[0]);
+  sendToPlayers(th_data.conn_sct_dsc, msg[0]);
+  msg[0][0] = 'w';
+  msg[0][1] = won;
+  msg[0][2] = '\0';
+  printf("Wysyłam %s\n",  msg[0]);
+  if(won != 'X')//if client 0 do not loose by connection lost
+    writeMsg(th_data.conn_sct_dsc[0], msg[0], sizeof(char) * strlen(msg[0]));
+  if(won != 'O')//if client 1 do not loose by connection lost
+    writeMsg(th_data.conn_sct_dsc[1], msg[0], sizeof(char) * strlen(msg[0]));
+  //sendToPlayers(th_data.conn_sct_dsc, msg[0]);
+
+  //Read answer for question does they want a replay
+  readMsg(th_data.conn_sct_dsc[0], msg[0], lastMsg[0], buffer);
+  if(msg[0][0] != 'r' && msg[0][0] != 'e'){//if not replay answer and not end connection
+    printf("Błąd przy próbie odczytania wiadomości o ponownej rozgrywce od klienta o deskryptorze %d\n", th_data.conn_sct_dsc[0]);
+    printf("msg=%s\n", msg[0]);
+    exit(-1);
+  }
+  readMsg(th_data.conn_sct_dsc[1], msg[1], lastMsg[1], buffer);
+  printf("0=%s\n1=%s\n", msg[0], msg[1]);
+  if(msg[1][0] != 'r' && msg[1][0] != 'e'){//if not replay answer and not end connection
+    printf("Błąd przy próbie odczytania wiadomości o ponownej rozgrywce od klienta o deskryptorze %d\n", th_data.conn_sct_dsc[0]);
+    printf("msg=%s\n", msg[1]);
+    exit(-1);
+  }
+  else{
+    if(strcmp(msg[0], "ry") == 0 && strcmp(msg[1], "ry") == 0){
+      createGameThread(th_data);
+    }
+  }
+}
+
+/*
 Check moves of clients and send them information,
 do they can make such a move and do someone won
 At the end of the game send conn_sct_dsc to Queue
 if client want to play again
 */
 void *StartGame(void *t_data){
+  //initializing block
   printf("Tworze nowa gre.\n");
   fflush(stdout);
   if(pthread_detach(pthread_self()) != 0){
@@ -429,17 +436,15 @@ void *StartGame(void *t_data){
   memset(tab, '-', sizeof(char) * 9);
   memset(lastMsg[0], '\0', sizeof(char) * 11);
   memset(lastMsg[1], '\0', sizeof(char) * 11);
-  for(int i = 0; i < 2; i++){
-      msgToClient[i][0] = turn;
-      if(i == 0)
-        msgToClient[i][1] = 'x';
-      else
-        msgToClient[i][1] = 'o';
-  }
-  writeMsg(th_data.conn_sct_dsc[0], msgToClient[0], sizeof(char) * 2);
-  writeMsg(th_data.conn_sct_dsc[1], msgToClient[1], sizeof(char) * 2);
-  while(won == 'n')
-  {
+
+  //set who's turn is now
+  strcpy(msgToClient[0], "nxx");
+  strcpy(msgToClient[1], "nxo");
+  writeMsg(th_data.conn_sct_dsc[0], msgToClient[0], sizeof(char) * strlen(msgToClient[0]));
+  writeMsg(th_data.conn_sct_dsc[1], msgToClient[1], sizeof(char) * strlen(msgToClient[1]));
+
+  //Game loop
+  while(won == 'n'){
     for(int i =0; i <2; i++){
       if(won == 'n'){
         do{
@@ -450,41 +455,16 @@ void *StartGame(void *t_data){
             field = (int)newMsg[0] - (int)'0';
           else{
             if(i == 0)
-              won = 'o';
+              won = 'O';
             else
-              won = 'x';
+              won = 'X';
           }
         }while(!checkMove(th_data.conn_sct_dsc, &turn, field, tab) && newMsg[0] != 'e');
         won = checkWinCondition(tab);
       }
-
     }
-    /*do{
-      readMsg(th_data.conn_sct_dsc[1], newMsg, lastMsg[1], buffer);
-      printf("Odebrałem %s\n", newMsg);
-      fflush(stdout);
-      if(newMsg[0] != 'e')
-        field = (int)newMsg[0] - (int)'0';
-      else
-        won = 'o';
-    }while(!checkMove(th_data.conn_sct_dsc, 'x', field, tab) && newMsg[0] != 'e');
-    do{
-      readMsg(th_data.conn_sct_dsc[0], newMsg, lastMsg[0], buffer);
-      if(newMsg[0] != 'e')
-        field = (int)newMsg[0] - (int)'0';
-        else
-          won = 'x' - (int)'0';
-    }while(!checkMove(th_data.conn_sct_dsc, 'o', field, tab) && newMsg[0] != 'e');*/
-
-    //printf("wiadomość = %s\n", newMsg);
-    //printf("pozostało = %s\n", lastMsg[1]);
-    //fflush(stdout);
-    sleep(2);
   }
-  msgToClient[0][0] = msgToClient[1][0] = 'w';
-  msgToClient[0][1] = msgToClient[1][1] = won;
-  writeMsg(th_data.conn_sct_dsc[0], msgToClient[0], sizeof(char) * 2);
-  writeMsg(th_data.conn_sct_dsc[1], msgToClient[1], sizeof(char) * 2);
+  endGame(th_data, won, lastMsg);
   pthread_exit(NULL);
 }
 

@@ -65,9 +65,6 @@ public class WindowMouseListener implements MouseListener{
             fieldClicked = findField(e);
         }
         if(Game.getSign() == Game.getTurn() && fieldClicked != -1){
-            /*char msg[] = new char[2];
-            msg[0] = (char)fieldClicked;
-            msg[1] = '\n';*/
             String msg = String.valueOf(fieldClicked) + '\n';
             ServerConnetioner.writeMsg(msg);
         }

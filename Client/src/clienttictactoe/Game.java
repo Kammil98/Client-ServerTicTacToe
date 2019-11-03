@@ -7,6 +7,8 @@ package clienttictactoe;
 
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.Arrays;
+import javax.swing.JOptionPane;
 import javax.swing.Timer;
 import window.GameJPanel;
 
@@ -42,24 +44,23 @@ public class Game  implements ActionListener{
     public Game(GameJPanel panel, int CPS){
         this.CPS = CPS;
         this.panel = panel;
-        String msg = null;
-        while(msg == null)
-            msg = ServerConnetioner.readMsg();
-        Game.turn = msg.charAt(0);
-        Game.sign = msg.charAt(1);
+        Game.turn = 'n';
+        Game.sign = 'n';
         clearBoard();
-        System.out.println("Initialized game.\n" + Game.turn + " starts.\nYour sign is " + Game.sign);
         timer = new Timer(1000 / CPS, this);
         timer.setInitialDelay(0);
         timer.start();
     }
-    
-    
     private void handleReceivedMsg(String msg){
         if(msg == null)
             return;
         System.out.println(msg);
         switch(msg.charAt(0)){
+            case 'n'://new Game
+                clearBoard();
+                Game.turn = msg.charAt(1);
+                Game.sign = msg.charAt(2);
+                System.out.println("Initialized game.\n" + Game.turn + " starts.\nYour sign is " + Game.sign);
             case 't'://change turn
                 turn = msg.charAt(1);
                 break;
@@ -67,6 +68,28 @@ public class Game  implements ActionListener{
                 panel.setSign(msg.charAt(1), msg.charAt(2) - '0');
                 break;
             case 'w'://someone won
+                int n;
+                String dialogMsg;
+                String[] options = {"Tak", "Nie"};
+                if(msg.charAt(1) == Game.sign)
+                    dialogMsg = "Gratulacje, wygrałeś!";
+                else if(msg.charAt(1) == 'd')
+                    dialogMsg = "Remis.";
+                else if(msg.charAt(1) == 'X' || msg.charAt(1) == 'O')
+                    dialogMsg = "Wygrałeś przez walkower. Drugi gracz się rozłączył.";
+                else 
+                    dialogMsg = "Przegrałeś :(";
+                dialogMsg += "\nCzy chcesz zagrać ponownie?";
+                n = JOptionPane.showOptionDialog(null, dialogMsg, null, 
+                        JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE, 
+                        null, options, null);
+                if(n == 0)//Want to play again
+                    msg = "ry" + '\n';
+                else
+                    msg = "rn" + '\n';
+                System.out.println("n= " + n);
+                System.out.println(msg);
+                ServerConnetioner.writeMsg(msg);
                 break;
         }
     }
@@ -78,7 +101,8 @@ public class Game  implements ActionListener{
      */
     @Override
     public void actionPerformed(ActionEvent e) {
-        String msg = ServerConnetioner.readMsg();
+        String msg = null;
+        msg = ServerConnetioner.readMsg();
         handleReceivedMsg(msg);
     }
 
