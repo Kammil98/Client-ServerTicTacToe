@@ -18,7 +18,7 @@
 #include <pthread.h>
 
 #define KEY 1234
-#define SERVER_PORT 1235
+#define SERVER_PORT 1234
 #define MAX_GAMES 100
 #define QUEUE_SIZE 5 // this is ignored anyway
 #define END_OF_MSG '-'
@@ -309,6 +309,8 @@ void readMsg(int conn_sct_dsc, char* newMsg, char* lastMsg, char* buffer){
 Write message to Client
 */
 void writeMsg(int conn_sct_dsc, char* message, int size){
+  message[size] = '\n';
+  size ++;
   int count = 0;
   int temp_count = 0;
   while(count != size){
@@ -326,9 +328,9 @@ void writeMsg(int conn_sct_dsc, char* message, int size){
 Check if move is proper
 and send notyfication to Clients if it is proper
 */
-bool checkMove(int conn_sct_dsc[], char sign, int field, char tab[]){
+bool checkMove(int conn_sct_dsc[], char *sign, int field, char tab[]){
 char secondSign;
-  if(sign == 'x')
+  if(*sign == 'x')
     secondSign = 'o';
   else
     secondSign = 'x';
@@ -336,25 +338,24 @@ char secondSign;
   memset(msgToClient[0], '\0', sizeof(char) * 11);
   memset(msgToClient[1], '\0', sizeof(char) * 11);
   if(tab[field] == '-'){
-    tab[field] = sign;
+    tab[field] = *sign;
     //send notyfication about move
     msgToClient[0][0] = msgToClient[1][0] = 's';
-    msgToClient[0][1] = msgToClient[1][1] = sign;
+    msgToClient[0][1] = msgToClient[1][1] = *sign;
     msgToClient[0][2] = msgToClient[1][2] = (char)field + '0';
-    msgToClient[0][3] = msgToClient[1][3] = '\n';
-    printf("Wysyłam %s\n",  msgToClient[0]);
-    fflush(stdout);
-    writeMsg(conn_sct_dsc[0], msgToClient[0], sizeof(char) * 4);
-    writeMsg(conn_sct_dsc[1], msgToClient[1], sizeof(char) * 4);
-
-    //send notyfication about change turn
-    msgToClient[0][0] = msgToClient[1][0] = 't';
-    msgToClient[0][1] = msgToClient[1][1] = secondSign;
-    msgToClient[0][2] = msgToClient[1][2] = '\n';
     printf("Wysyłam %s\n",  msgToClient[0]);
     fflush(stdout);
     writeMsg(conn_sct_dsc[0], msgToClient[0], sizeof(char) * 3);
     writeMsg(conn_sct_dsc[1], msgToClient[1], sizeof(char) * 3);
+
+    //send notyfication about change turn
+    *sign = secondSign;
+    msgToClient[0][0] = msgToClient[1][0] = 't';
+    msgToClient[0][1] = msgToClient[1][1] = *sign;
+    printf("Wysyłam %s\n",  msgToClient[0]);
+    fflush(stdout);
+    writeMsg(conn_sct_dsc[0], msgToClient[0], sizeof(char) * 2);
+    writeMsg(conn_sct_dsc[1], msgToClient[1], sizeof(char) * 2);
     return true;
   }
   else{
@@ -363,6 +364,46 @@ char secondSign;
     sleep(1);
   }
   return false;
+}
+
+
+/*
+return character of winner if someone won
+or 'n' if none won
+or 'd' if there is a draw
+*/
+char checkWinCondition(char tab[]){
+  for(int i = 0; i <3; i++){
+    if(tab[i] != '-' && tab[i] == tab[i + 3] && tab[i + 3] == tab[i + 6]){//vertical line
+      printf("Mam1 i=%d", i);
+      fflush(stdout);
+      return tab[i];
+    }
+    if(tab[i * 3] != '-' && tab[i * 3] == tab[i * 3 + 1] && tab[i * 3 + 1] == tab[i * 3 + 2]){//horizontal line
+      printf("Mam2 i=%d", i);
+      fflush(stdout);
+      return tab[i * 3];
+    }
+  }
+  if(tab[0] != '-' && tab[0] == tab[4] && tab[4] == tab[8]){
+    printf("Mam3 tab[0]=%d", tab[0]);
+    fflush(stdout);
+    return tab[0];
+  }
+
+  if(tab[2] != '-' && tab[2] == tab[4] && tab[4] == tab[6]){
+    printf("Mam4 tab[2]=%d", tab[2]);
+    fflush(stdout);
+    return tab[2];
+  }
+  for(int i = 0; i <9; i++){
+    if(tab[i] == '-'){
+      printf("Mam5 i=%d", i);
+      fflush(stdout);
+      return 'n';
+    }
+  }
+  return 'd';
 }
 
 
@@ -391,16 +432,34 @@ void *StartGame(void *t_data){
   for(int i = 0; i < 2; i++){
       msgToClient[i][0] = turn;
       if(i == 0)
-        msgToClient[i][1] = 'o';
-      else
         msgToClient[i][1] = 'x';
-      msgToClient[i][2] = '\n';
-    }
-  writeMsg(th_data.conn_sct_dsc[0], msgToClient[0], sizeof(char) * 3);
-  writeMsg(th_data.conn_sct_dsc[1], msgToClient[1], sizeof(char) * 3);
+      else
+        msgToClient[i][1] = 'o';
+  }
+  writeMsg(th_data.conn_sct_dsc[0], msgToClient[0], sizeof(char) * 2);
+  writeMsg(th_data.conn_sct_dsc[1], msgToClient[1], sizeof(char) * 2);
   while(won == 'n')
   {
-    do{
+    for(int i =0; i <2; i++){
+      if(won == 'n'){
+        do{
+          readMsg(th_data.conn_sct_dsc[i], newMsg, lastMsg[i], buffer);
+          printf("Odebrałem %s\n", newMsg);
+          fflush(stdout);
+          if(newMsg[0] != 'e')
+            field = (int)newMsg[0] - (int)'0';
+          else{
+            if(i == 0)
+              won = 'o';
+            else
+              won = 'x';
+          }
+        }while(!checkMove(th_data.conn_sct_dsc, &turn, field, tab) && newMsg[0] != 'e');
+        won = checkWinCondition(tab);
+      }
+
+    }
+    /*do{
       readMsg(th_data.conn_sct_dsc[1], newMsg, lastMsg[1], buffer);
       printf("Odebrałem %s\n", newMsg);
       fflush(stdout);
@@ -415,13 +474,17 @@ void *StartGame(void *t_data){
         field = (int)newMsg[0] - (int)'0';
         else
           won = 'x' - (int)'0';
-    }while(!checkMove(th_data.conn_sct_dsc, 'o', field, tab) && newMsg[0] != 'e');
+    }while(!checkMove(th_data.conn_sct_dsc, 'o', field, tab) && newMsg[0] != 'e');*/
 
     //printf("wiadomość = %s\n", newMsg);
     //printf("pozostało = %s\n", lastMsg[1]);
     //fflush(stdout);
     sleep(2);
   }
+  msgToClient[0][0] = msgToClient[1][0] = 'w';
+  msgToClient[0][1] = msgToClient[1][1] = won;
+  writeMsg(th_data.conn_sct_dsc[0], msgToClient[0], sizeof(char) * 2);
+  writeMsg(th_data.conn_sct_dsc[1], msgToClient[1], sizeof(char) * 2);
   pthread_exit(NULL);
 }
 
@@ -530,15 +593,15 @@ void acceptClients(int server_sct_dsc, struct ipcid ipcid){
 int main(int argc, char* argv[])
 {
   struct ipcid ipcid;
-   int server_sct_dsc;
-   server_sct_dsc = prepare_socket(argv);
-   createIPC(&ipcid);
-   wakeUpMatchClients(ipcid);
-   while(1)
-   {
+  int server_sct_dsc;
+  server_sct_dsc = prepare_socket(argv);
+  createIPC(&ipcid);
+  wakeUpMatchClients(ipcid);
+  while(1)
+  {
     acceptClients(server_sct_dsc, ipcid);
   }
   releaseIPC(ipcid);
-   close(server_sct_dsc);
-   return(0);
+  close(server_sct_dsc);
+  return(0);
 }
