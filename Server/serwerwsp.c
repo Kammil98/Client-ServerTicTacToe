@@ -18,7 +18,7 @@
 #include <pthread.h>
 
 #define KEY 1234
-#define SERVER_PORT 1235
+#define SERVER_PORT 1234
 #define MAX_GAMES 100
 #define QUEUE_SIZE 5 // this is ignored anyway
 #define END_OF_MSG '-'
@@ -237,10 +237,13 @@ void readMsg(int conn_sct_dsc, char* newMsg, char* lastMsg, char* buffer){
   if(count == 0){
     printf("Klient zakończył grę\n");
     fflush(stdout);
-    buffer[0] = 'e';//end
-    buffer[1] = '\n';//end
+    newMsg[0] = 'e';//end
+    newMsg[1] = '\n';
+    newMsg[2] = '\0';
   }
   else{
+    printf("buffer = %s\n", buffer);
+    fflush(stdout);
     strcpy(lastMsg, buffer);
     if(searchLastMsgs(newMsg, lastMsg))
       return;
@@ -259,9 +262,14 @@ void writeMsg(int conn_sct_dsc, char* message, int size){
   int count = 0;
   int temp_count = 0;
   while(count != size){
+    printf("writeMsg wysyła\n");
+    fflush(stdout);
     temp_count = write(conn_sct_dsc, &message[count], size - count * sizeof(char));
+    printf("writeMsg wysłał %d znaków\n", temp_count);
+    fflush(stdout);
     if(temp_count < 0){
       fprintf(stderr, "Błąd przy próbie wysłania danych do klienta o deskryptorze %d.\n", conn_sct_dsc);
+      fflush(stdout);
       exit(-1);
     }
     count += temp_count;
@@ -315,7 +323,6 @@ char secondSign;
   else{
     printf("field = %d\ntab[field] = %c\n", field, tab[field]);
     fflush(stdout);
-    sleep(1);
   }
   return false;
 }
@@ -386,9 +393,9 @@ void endGame(struct thread_data_t th_data, char won, char lastMsg[2][11]){
   msg[0][1] = won;
   msg[0][2] = '\0';
   printf("Wysyłam %s\n",  msg[0]);
-  if(won != 'X')//if client 0 do not loose by connection lost
+  if(won != 'O')//if client 0 do not loose by connection lost
     writeMsg(th_data.conn_sct_dsc[0], msg[0], sizeof(char) * strlen(msg[0]));
-  if(won != 'O')//if client 1 do not loose by connection lost
+  if(won != 'X')//if client 1 do not loose by connection lost
     writeMsg(th_data.conn_sct_dsc[1], msg[0], sizeof(char) * strlen(msg[0]));
   //sendToPlayers(th_data.conn_sct_dsc, msg[0]);
 
@@ -410,8 +417,32 @@ void endGame(struct thread_data_t th_data, char won, char lastMsg[2][11]){
     if(strcmp(msg[0], "ry") == 0 && strcmp(msg[1], "ry") == 0){
       createGameThread(th_data);
     }
+    else{
+      struct msgbuf sender;
+      sender.mtype = 1;
+      int msgSucces;
+      for(int i = 0; i < 2; i++){
+        if(strcmp(msg[i], "ry") == 0){
+          sender.conn_sct_dsc = th_data.conn_sct_dsc[i];
+          mutex_lock(th_data.ipcid.semid, 1, 1);//block opssibility of sending messages
+          printf("Send nr 0 to Queue\n");
+          fflush(stdout);
+          msgSucces = msgsnd(th_data.ipcid.msgid, &sender, sizeof(sender.conn_sct_dsc), 0);
+          if ( msgSucces == -1){
+            printf("Błąd przy próbie wysłania komunikatu\n");
+            fflush(stdout);
+            exit(1);
+          }
+          else{
+            mutex_unlock(th_data.ipcid.semid, 0, 1);//allow matchClients function to take message
+          }
+          mutex_unlock(th_data.ipcid.semid, 1, 1);
+        }
+      }
+    }
   }
 }
+
 
 /*
 Check moves of clients and send them information,
@@ -436,6 +467,10 @@ void *StartGame(void *t_data){
   memset(tab, '-', sizeof(char) * 9);
   memset(lastMsg[0], '\0', sizeof(char) * 11);
   memset(lastMsg[1], '\0', sizeof(char) * 11);
+  memset(buffer, '\0', sizeof(char) * 11);
+  memset(newMsg, '\0', sizeof(char) * 11);
+  memset(msgToClient[0], '\0', sizeof(char) * 11);
+  memset(msgToClient[1], '\0', sizeof(char) * 11);
 
   //set who's turn is now
   strcpy(msgToClient[0], "nxx");
@@ -449,8 +484,6 @@ void *StartGame(void *t_data){
       if(won == 'n'){
         do{
           readMsg(th_data.conn_sct_dsc[i], newMsg, lastMsg[i], buffer);
-          printf("Odebrałem %s\n", newMsg);
-          fflush(stdout);
           if(newMsg[0] != 'e')
             field = (int)newMsg[0] - (int)'0';
           else{
@@ -460,7 +493,8 @@ void *StartGame(void *t_data){
               won = 'X';
           }
         }while(!checkMove(th_data.conn_sct_dsc, &turn, field, tab) && newMsg[0] != 'e');
-        won = checkWinCondition(tab);
+        if(won == 'n')
+          won = checkWinCondition(tab);
       }
     }
   }
@@ -555,8 +589,9 @@ void acceptClients(int server_sct_dsc, struct ipcid ipcid){
      exit(1);
   }
   sender.conn_sct_dsc = conn_sct_dsc;
-
+  mutex_lock(ipcid.semid, 1, 1);//block opssibility of sending messages
   msgSucces = msgsnd(ipcid.msgid, &sender, sizeof(sender.conn_sct_dsc), 0);
+  mutex_unlock(ipcid.semid, 1, 1);//block opssibility of sending messages
   if ( msgSucces == -1){
     printf("Argumenty msgid=%d\nsender.conn_sct_dsc=%d\n", ipcid.msgid, sender.conn_sct_dsc);
     perror("Błąd przy próbie wysłania komunikatu");

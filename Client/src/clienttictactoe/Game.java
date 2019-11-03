@@ -9,8 +9,10 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.Arrays;
 import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import window.GameJPanel;
+import window.MainWindowFrame;
 
 /**
  *
@@ -51,6 +53,38 @@ public class Game  implements ActionListener{
         timer.setInitialDelay(0);
         timer.start();
     }
+    
+    
+    private void endGame(String msg){
+        int n;
+        String dialogMsg;
+        String[] options = {"Tak", "Nie"};
+        if(msg.charAt(1) == Game.sign)
+            dialogMsg = "Gratulacje, wygrałeś!";
+        else if(msg.charAt(1) == 'd')
+            dialogMsg = "Remis.";
+        else if(msg.charAt(1) == 'X' || msg.charAt(1) == 'O')
+            dialogMsg = "Wygrałeś przez walkower. Drugi gracz się rozłączył.";
+        else 
+            dialogMsg = "Przegrałeś :(";
+        dialogMsg += "\nCzy chcesz zagrać ponownie?";
+        n = JOptionPane.showOptionDialog(null, dialogMsg, null, 
+                JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE, 
+                null, options, null);
+        if(n == 0)//Want to play again
+            msg = "ry" + '\n';
+        else
+            msg = "rn" + '\n';
+        System.out.println("n= " + n);
+        System.out.println(msg);
+        ServerConnetioner.writeMsg(msg);
+        if(n == 1){
+            MainWindowFrame frame = (MainWindowFrame) SwingUtilities.getWindowAncestor(panel);
+            frame.CloseWindow();
+            System.exit(0);
+        }
+    }
+    
     private void handleReceivedMsg(String msg){
         if(msg == null)
             return;
@@ -68,28 +102,7 @@ public class Game  implements ActionListener{
                 panel.setSign(msg.charAt(1), msg.charAt(2) - '0');
                 break;
             case 'w'://someone won
-                int n;
-                String dialogMsg;
-                String[] options = {"Tak", "Nie"};
-                if(msg.charAt(1) == Game.sign)
-                    dialogMsg = "Gratulacje, wygrałeś!";
-                else if(msg.charAt(1) == 'd')
-                    dialogMsg = "Remis.";
-                else if(msg.charAt(1) == 'X' || msg.charAt(1) == 'O')
-                    dialogMsg = "Wygrałeś przez walkower. Drugi gracz się rozłączył.";
-                else 
-                    dialogMsg = "Przegrałeś :(";
-                dialogMsg += "\nCzy chcesz zagrać ponownie?";
-                n = JOptionPane.showOptionDialog(null, dialogMsg, null, 
-                        JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE, 
-                        null, options, null);
-                if(n == 0)//Want to play again
-                    msg = "ry" + '\n';
-                else
-                    msg = "rn" + '\n';
-                System.out.println("n= " + n);
-                System.out.println(msg);
-                ServerConnetioner.writeMsg(msg);
+                endGame(msg);
                 break;
         }
     }
