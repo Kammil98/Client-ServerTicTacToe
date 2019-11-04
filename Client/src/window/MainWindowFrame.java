@@ -32,7 +32,7 @@ public class MainWindowFrame extends javax.swing.JFrame {
         activePanel.setVisible(true);
         pack();
         setSize(500, 400);
-        setResizable(false);
+        //setResizable(false);
         drawer = new AnimationDrawer(getActivePanel(), 40);
         game = new Game((GameJPanel)activePanel, 250);
     }

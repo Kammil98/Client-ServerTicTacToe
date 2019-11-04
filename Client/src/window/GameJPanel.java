@@ -23,11 +23,17 @@ public class GameJPanel extends javax.swing.JPanel {
      * table with places where draw x and o
      */
     private char[] board;
+    private String sign;
+    private String turn;
+    private String gameState;
     /**
      * Creates new form GameJPanel
      */
     public GameJPanel() {
         initComponents();
+        sign = " ";
+        turn = " ";
+        gameState = "Oczekiwanie";
         board = new char[9];
         for(int i = 0; i < 9; i++)
             board[i] = '-';
@@ -41,6 +47,7 @@ public class GameJPanel extends javax.swing.JPanel {
         super.paintComponent(g);
         Graphics2D g2d = (Graphics2D) g;
         drawBoard(g2d);
+        drawStrings(g2d);
         g2d.dispose();
     }
     /**
@@ -56,11 +63,11 @@ public class GameJPanel extends javax.swing.JPanel {
         this.setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 400, Short.MAX_VALUE)
+            .addGap(0, 414, Short.MAX_VALUE)
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 300, Short.MAX_VALUE)
+            .addGap(0, 400, Short.MAX_VALUE)
         );
     }// </editor-fold>//GEN-END:initComponents
 
@@ -167,11 +174,46 @@ public class GameJPanel extends javax.swing.JPanel {
     }
     
     
+    public void drawStrings(Graphics2D g2d){
+        float width =  getWidth(), height = getHeight();
+        g2d.drawString("Twój znak", width - 80, 10);
+        g2d.drawString(this.sign, width - 80, 30);
+        g2d.drawString("Tura", width - 80, 110);
+        g2d.drawString(this.turn, width - 80, 130);
+        g2d.drawString(this.gameState, width - 80, 300);
+        
+    }
     /**
      * @param sign sign on board to set
      * @param place place on baord to set sign in range <0, 8>
      */
     public void setSign(char sign, int place) {
         this.board[place] = sign;
+    }
+    
+    
+    /**
+     * @param sign the sign to set
+     */
+    public void setSign(String sign) {
+        if("n".equals(sign))
+            sign = " ";
+        this.sign = sign;
+    }
+
+    /**
+     * @param turn the turn to set
+     */
+    public void setTurn(String turn) {
+        if("n".equals(turn))
+            turn = " ";
+        this.turn = turn;
+    }
+
+    /**
+     * @param gameState the gameState to set
+     */
+    public void setGameState(String gameState) {
+        this.gameState = gameState;
     }
 }

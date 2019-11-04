@@ -7,7 +7,6 @@ package clienttictactoe;
 
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.util.Arrays;
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
@@ -92,11 +91,12 @@ public class Game  implements ActionListener{
         switch(msg.charAt(0)){
             case 'n'://new Game
                 clearBoard();
-                Game.turn = msg.charAt(1);
-                Game.sign = msg.charAt(2);
+                panel.setGameState("Połączono");
+                setTurn(msg.charAt(1));
+                setSign(msg.charAt(2));
                 System.out.println("Initialized game.\n" + Game.turn + " starts.\nYour sign is " + Game.sign);
             case 't'://change turn
-                turn = msg.charAt(1);
+                setTurn(msg.charAt(1));
                 break;
             case 's'://set sign on postion
                 panel.setSign(msg.charAt(1), msg.charAt(2) - '0');
@@ -104,6 +104,9 @@ public class Game  implements ActionListener{
             case 'w'://someone won
                 endGame(msg);
                 break;
+            case 'S':
+                setSign(msg.charAt(1));
+                panel.setGameState("Oczekiwanie");
         }
     }
     
@@ -114,7 +117,7 @@ public class Game  implements ActionListener{
      */
     @Override
     public void actionPerformed(ActionEvent e) {
-        String msg = null;
+        String msg;
         msg = ServerConnetioner.readMsg();
         handleReceivedMsg(msg);
     }
@@ -152,4 +155,21 @@ public class Game  implements ActionListener{
         return sign;
     }
     
+    
+    /**
+     * @param aTurn the turn to set
+     */
+    public void setTurn(char aTurn) {
+        panel.setTurn(String.valueOf(aTurn));
+        turn = aTurn;
+    }
+
+    
+    /**
+     * @param aSign the sign to set
+     */
+    public void setSign(char aSign) {
+        panel.setSign(String.valueOf(aSign));
+        sign = aSign;
+    }
 }

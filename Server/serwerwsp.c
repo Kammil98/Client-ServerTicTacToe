@@ -258,11 +258,12 @@ Write message to Client
 */
 void writeMsg(int conn_sct_dsc, char* message, int size){
   message[size] = '\n';
-  size ++;
+  size += sizeof(char);
   int count = 0;
   int temp_count = 0;
   while(count != size){
-    printf("writeMsg wysyła\n");
+    printf("writeMsg wysyła %s \n", message);
+    printf("size - count * sizeof(char) = %lu \n", size - count * sizeof(char));
     fflush(stdout);
     temp_count = write(conn_sct_dsc, &message[count], size - count * sizeof(char));
     printf("writeMsg wysłał %d znaków\n", temp_count);
@@ -388,11 +389,13 @@ void endGame(struct thread_data_t th_data, char won, char lastMsg[2][11]){
   //send winner and set, that it is noone turn
   strcpy(msg[0], "tn");
   printf("Wysyłam %s\n",  msg[0]);
+  fflush(stdout);
   sendToPlayers(th_data.conn_sct_dsc, msg[0]);
   msg[0][0] = 'w';
   msg[0][1] = won;
   msg[0][2] = '\0';
   printf("Wysyłam %s\n",  msg[0]);
+  fflush(stdout);
   if(won != 'O')//if client 0 do not loose by connection lost
     writeMsg(th_data.conn_sct_dsc[0], msg[0], sizeof(char) * strlen(msg[0]));
   if(won != 'X')//if client 1 do not loose by connection lost
@@ -415,6 +418,8 @@ void endGame(struct thread_data_t th_data, char won, char lastMsg[2][11]){
   }
   else{
     if(strcmp(msg[0], "ry") == 0 && strcmp(msg[1], "ry") == 0){
+      strcpy(msg[0], "Sn");
+      sendToPlayers(th_data.conn_sct_dsc, msg[0]);
       createGameThread(th_data);
     }
     else{
@@ -423,6 +428,8 @@ void endGame(struct thread_data_t th_data, char won, char lastMsg[2][11]){
       int msgSucces;
       for(int i = 0; i < 2; i++){
         if(strcmp(msg[i], "ry") == 0){
+          strcpy(msg[0], "Sn");
+          writeMsg(th_data.conn_sct_dsc[i], msg[0], sizeof(char) * strlen(msg[0]));
           sender.conn_sct_dsc = th_data.conn_sct_dsc[i];
           mutex_lock(th_data.ipcid.semid, 1, 1);//block opssibility of sending messages
           printf("Send nr 0 to Queue\n");
@@ -531,13 +538,15 @@ void *matchClients(void *t_data) {
     }
     else{
       clients_dsc[i] = receiver.conn_sct_dsc;
+      th_data.conn_sct_dsc[i] = receiver.conn_sct_dsc;
       i++;
       printf("Dodaje klienta do gry.\n");
       fflush(stdout);
     }
     if(i == 2){
       i = 0;
-      gameData = (struct thread_data_t *)malloc(sizeof(struct thread_data_t));
+      createGameThread(th_data);
+      /*gameData = (struct thread_data_t *)malloc(sizeof(struct thread_data_t));
       (*gameData).conn_sct_dsc[0] = clients_dsc[0];
       (*gameData).conn_sct_dsc[1] = clients_dsc[1];
       (*gameData).ipcid = th_data.ipcid;
@@ -545,7 +554,7 @@ void *matchClients(void *t_data) {
       if (create_result){
          printf("Błąd przy próbie utworzenia wątku dobierajacego w pary klientów, kod błędu: %d\n", create_result);
          exit(-1);
-      }
+      }*/
     }
   }
   pthread_exit(NULL);
