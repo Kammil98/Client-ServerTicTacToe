@@ -5,6 +5,7 @@
  */
 package clienttictactoe;
 
+import static java.lang.System.exit;
 import window.MainWindowFrame;
 
 /**
@@ -21,7 +22,26 @@ public class ClientTicTacToe {
      * @param args the command line arguments
      */
     public static void main(String[] args) {
-        ServerConnetioner conn = new ServerConnetioner(1235, "localhost");
+        int port = -1;
+        String serverAddr = null;
+        if(args.length % 2 != 0){
+            System.out.println("Niepoprawna ilość argumentów");
+            exit(-1);
+        }
+        for(int i = 0; i < args.length; i += 2){
+            switch(args[i]){
+                case "-p": 
+                    port = Integer.parseInt(args[i + 1]);
+                    break;
+                case "-a":
+                    serverAddr = args[i + 1];
+                    break;
+                default:
+                    System.out.println("Niepoprawny argument nr " + (i/2 + 1));
+                    exit(-1);
+            }
+        }
+        ServerConnetioner conn = new ServerConnetioner(port, serverAddr);
         MainWindowFrame.main(args);
     }
     

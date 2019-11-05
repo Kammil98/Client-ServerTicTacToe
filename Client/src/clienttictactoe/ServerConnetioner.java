@@ -61,22 +61,26 @@ public class ServerConnetioner {
      * @param IPaddr server IP
      */
     public ServerConnetioner(int port, String IPaddr){
-            ServerConnetioner.port = port;
-            InetAddress addr = null;
-            OutputStream os = null;
-            InputStream is = null;
-            socket = null;
-            try {
-                socket = new Socket("localhost", port);
-                addr = socket.getInetAddress();
-                os = socket.getOutputStream();
-                is = socket.getInputStream();
-            } catch (IOException ex) {
-            Logger.getLogger(ServerConnetioner.class.getName()).log(Level.SEVERE, null, ex);
-            }
-            bw = new BufferedWriter(new OutputStreamWriter(os));
-            br = new BufferedReader(new InputStreamReader(is));
-            System.out.println("Connected to " + addr);
+        if(port == -1)
+            port = 1235;
+        if(IPaddr == null)
+            IPaddr = "localhost";
+        ServerConnetioner.port = port;
+        InetAddress addr = null;
+        OutputStream os = null;
+        InputStream is = null;
+        socket = null;
+        try {
+            socket = new Socket(IPaddr, port);
+            addr = socket.getInetAddress();
+            os = socket.getOutputStream();
+            is = socket.getInputStream();
+        } catch (IOException ex) {
+        Logger.getLogger(ServerConnetioner.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        bw = new BufferedWriter(new OutputStreamWriter(os));
+        br = new BufferedReader(new InputStreamReader(is));
+        System.out.println("Connected to " + addr);
     }
     
     /**
@@ -114,6 +118,8 @@ public class ServerConnetioner {
     public static void closeConnection(){
         try {
             System.out.println("Zamykam połączenie");
+            bw.close();
+            br.close();
             socket.close();
         } catch (IOException ex) {
             Logger.getLogger(ServerConnetioner.class.getName()).log(Level.SEVERE, null, ex);

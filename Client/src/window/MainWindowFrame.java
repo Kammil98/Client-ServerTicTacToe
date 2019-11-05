@@ -6,6 +6,7 @@
 package window;
 
 import clienttictactoe.Game;
+import clienttictactoe.ServerConnetioner;
 import java.awt.BorderLayout;
 import javax.swing.JPanel;
 
@@ -53,6 +54,7 @@ public class MainWindowFrame extends javax.swing.JFrame {
     public void CloseWindow(){
         setVisible(false);
         dispose();
+        ServerConnetioner.closeConnection();
     }
     
     /**

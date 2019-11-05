@@ -74,8 +74,6 @@ public class Game  implements ActionListener{
             msg = "ry" + '\n';
         else
             msg = "rn" + '\n';
-        System.out.println("n= " + n);
-        System.out.println(msg);
         ServerConnetioner.writeMsg(msg);
         if(n == 1){
             MainWindowFrame frame = (MainWindowFrame) SwingUtilities.getWindowAncestor(panel);
@@ -87,14 +85,12 @@ public class Game  implements ActionListener{
     private void handleReceivedMsg(String msg){
         if(msg == null)
             return;
-        System.out.println(msg);
         switch(msg.charAt(0)){
             case 'n'://new Game
                 clearBoard();
                 panel.setGameState("Połączono");
                 setTurn(msg.charAt(1));
                 setSign(msg.charAt(2));
-                System.out.println("Initialized game.\n" + Game.turn + " starts.\nYour sign is " + Game.sign);
             case 't'://change turn
                 setTurn(msg.charAt(1));
                 break;
@@ -104,7 +100,7 @@ public class Game  implements ActionListener{
             case 'w'://someone won
                 endGame(msg);
                 break;
-            case 'S':
+            case 'S'://search new Game
                 setSign(msg.charAt(1));
                 panel.setGameState("Oczekiwanie");
         }
