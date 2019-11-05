@@ -21,7 +21,7 @@ public class ClientTicTacToe {
      * @param args the command line arguments
      */
     public static void main(String[] args) {
-        ServerConnetioner conn = new ServerConnetioner(1234, "localhost");
+        ServerConnetioner conn = new ServerConnetioner(1235, "localhost");
         MainWindowFrame.main(args);
     }
     

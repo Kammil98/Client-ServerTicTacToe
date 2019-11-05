@@ -18,7 +18,7 @@
 #include <pthread.h>
 
 #define KEY 1234
-#define SERVER_PORT 1234
+#define SERVER_PORT 1235
 #define MAX_GAMES 100
 #define QUEUE_SIZE 5 // this is ignored anyway
 #define END_OF_MSG '-'
@@ -53,7 +53,8 @@ struct buf_elem {
 
 
 void *StartGame(void *t_data);
-
+void endGame(struct thread_data_t th_data, char won, char lastMsg[2][11]);
+void endGameForClient(struct thread_data_t th_data, char won, char lastMsg[11]);
 
 /*
 semid - id of semaphore table
@@ -256,35 +257,55 @@ void readMsg(int conn_sct_dsc, char* newMsg, char* lastMsg, char* buffer){
 /*
 Write message to Client
 */
-void writeMsg(int conn_sct_dsc, char* message, int size){
-  message[size] = '\n';
+bool writeMsg(int conn_sct_dsc, char* message, int size){
+  char readyMsg[11];
+  strcpy(readyMsg, message);
+  readyMsg[size] = '\n';
+  readyMsg[size + 1] = '\0';
   size += sizeof(char);
   int count = 0;
-  int temp_count = 0;
+  int error = 0;
+  socklen_t len = sizeof (error);
+  int temp_count = 0, retval;
   while(count != size){
-    printf("writeMsg wysyła %s \n", message);
+    //not whole message was send and there is no error with connection
+    printf("writeMsg wysyła %s do %d\n", readyMsg, conn_sct_dsc);
     printf("size - count * sizeof(char) = %lu \n", size - count * sizeof(char));
     fflush(stdout);
-    temp_count = write(conn_sct_dsc, &message[count], size - count * sizeof(char));
+    retval = getsockopt(conn_sct_dsc, SOL_SOCKET, SO_ERROR, &error, &len);
+    if(retval < 0){
+      fprintf(stderr, "Błąd przy próbie sprawdzenia połączenia z klientem: %s\n", strerror(retval));
+      return false;
+    }
+    if(error != 0) {
+      fprintf(stderr, "Połączenie z klientem zostało zerwane: %s\n", strerror(error));
+      fflush(stderr);
+      return false;
+    }
+    temp_count = write(conn_sct_dsc, &readyMsg[count], size - count * sizeof(char));
     printf("writeMsg wysłał %d znaków\n", temp_count);
     fflush(stdout);
     if(temp_count < 0){
       fprintf(stderr, "Błąd przy próbie wysłania danych do klienta o deskryptorze %d.\n", conn_sct_dsc);
-      fflush(stdout);
-      exit(-1);
+      fflush(stderr);
+      return false;
     }
     count += temp_count;
   }
+
+  return true;
 }
 
 
 /*
 Send the same message to both players
 */
-void sendToPlayers(int conn_sct_dsc[2], char msg[]){
+void sendToPlayers(struct thread_data_t th_data, char msg[], char lastUnreadMsg[2][11]){
   int size = sizeof(char) * strlen(msg);
-  writeMsg(conn_sct_dsc[0], msg, size);
-  writeMsg(conn_sct_dsc[1], msg, size);
+  if(!writeMsg(th_data.conn_sct_dsc[0], msg, size))//if client is disconnected
+    endGameForClient(th_data, 'O', lastUnreadMsg[1]);
+  if(!writeMsg(th_data.conn_sct_dsc[1], msg, size))
+    endGameForClient(th_data, 'X', lastUnreadMsg[0]);
 }
 
 
@@ -292,7 +313,7 @@ void sendToPlayers(int conn_sct_dsc[2], char msg[]){
 Check if move is proper
 and send notyfication to Clients if it is proper
 */
-bool checkMove(int conn_sct_dscs[], char *sign, int field, char tab[]){
+bool checkMove(struct thread_data_t th_data, char *sign, int field, char tab[], char lastMsg[2][11]){
 char secondSign;
   if(*sign == 'x')
     secondSign = 'o';
@@ -309,7 +330,7 @@ char secondSign;
     msg[3] = '\0';
     printf("Wysyłam %s\n",  msg);
     fflush(stdout);
-    sendToPlayers(conn_sct_dscs, msg);
+    sendToPlayers(th_data, msg, lastMsg);
 
     //send notyfication about change turn
     *sign = secondSign;
@@ -318,7 +339,7 @@ char secondSign;
     msg[2] = '\0';
     printf("Wysyłam %s\n",  msg);
     fflush(stdout);
-    sendToPlayers(conn_sct_dscs, msg);
+    sendToPlayers(th_data, msg, lastMsg);
     return true;
   }
   else{
@@ -376,6 +397,67 @@ void createGameThread(struct thread_data_t t_data){
 
 
 /*
+Send client message who is the winner
+Ask him for replay and
+If he want reply, then send him to Queue
+of waiting players
+*/
+void endGameForClient(struct thread_data_t th_data, char won, char lastMsg[11]){
+  char msg[11];
+  char buffer[11];
+  int who_connected;
+  memset(buffer, '\0', sizeof(char) * 11);
+  //send winner and set, that it is noone turn
+  if(won == 'O')
+    who_connected = th_data.conn_sct_dsc[1];
+  else
+    who_connected = th_data.conn_sct_dsc[0];
+  strcpy(msg, "tn");
+  printf("Wysyłam %s\n",  msg);
+  fflush(stdout);
+  if(!writeMsg(who_connected, msg, sizeof(char) * strlen(msg)))//If this client also is disconnected
+    pthread_exit(NULL);
+  msg[0] = 'w';
+  msg[1] = won;
+  msg[2] = '\0';
+  printf("Wysyłam %s\n",  msg);
+  fflush(stdout);
+  if(!writeMsg(who_connected, msg, sizeof(char) * strlen(msg)))
+    pthread_exit(NULL);
+  readMsg(who_connected, msg, lastMsg, buffer);
+  if(msg[0] != 'r' && msg[0] != 'e'){//if not replay answer and not end connection
+    printf("Błąd przy próbie odczytania wiadomości o ponownej rozgrywce od klienta o deskryptorze %d\n", th_data.conn_sct_dsc[0]);
+    printf("msg=%s\n", msg);
+    exit(-1);
+  }
+  printf("odpowiedź=%s\n", msg);
+  struct msgbuf sender;
+  sender.mtype = 1;
+  int msgSucces;
+  if(strcmp(msg, "ry") == 0){
+    strcpy(msg, "Sn");
+    if(!writeMsg(who_connected, msg, sizeof(char) * strlen(msg)))
+      pthread_exit(NULL);
+    sender.conn_sct_dsc = who_connected;
+    mutex_lock(th_data.ipcid.semid, 1, 1);//block opssibility of sending messages
+    printf("Send to Queue\n");
+    fflush(stdout);
+    msgSucces = msgsnd(th_data.ipcid.msgid, &sender, sizeof(sender.conn_sct_dsc), 0);
+    if ( msgSucces == -1){
+      printf("Błąd przy próbie wysłania komunikatu\n");
+      fflush(stdout);
+      exit(1);
+    }
+    else{
+      mutex_unlock(th_data.ipcid.semid, 0, 1);//allow matchClients function to take message
+    }
+    mutex_unlock(th_data.ipcid.semid, 1, 1);
+  }
+  pthread_exit(NULL);
+}
+
+
+/*
 Send clients message who is the winner
 Ask them for replay and create next game
 if both want replay.
@@ -390,7 +472,9 @@ void endGame(struct thread_data_t th_data, char won, char lastMsg[2][11]){
   strcpy(msg[0], "tn");
   printf("Wysyłam %s\n",  msg[0]);
   fflush(stdout);
-  sendToPlayers(th_data.conn_sct_dsc, msg[0]);
+  //writeMsg(th_data.conn_sct_dsc[0], msg[0], sizeof(char) * strlen(msg[0]));
+  //writeMsg(th_data.conn_sct_dsc[1], msg[0], sizeof(char) * strlen(msg[0]));
+  sendToPlayers(th_data, msg[0], lastMsg);
   msg[0][0] = 'w';
   msg[0][1] = won;
   msg[0][2] = '\0';
@@ -416,38 +500,40 @@ void endGame(struct thread_data_t th_data, char won, char lastMsg[2][11]){
     printf("msg=%s\n", msg[1]);
     exit(-1);
   }
+  if(strcmp(msg[0], "ry") == 0 && strcmp(msg[1], "ry") == 0){
+    strcpy(msg[0], "Sn");
+    //writeMsg(th_data.conn_sct_dsc[0], msg[0], sizeof(char) * strlen(msg[0]));
+    //writeMsg(th_data.conn_sct_dsc[1], msg[0], sizeof(char) * strlen(msg[0]));
+    sendToPlayers(th_data, msg[0], lastMsg);
+    createGameThread(th_data);
+  }
   else{
-    if(strcmp(msg[0], "ry") == 0 && strcmp(msg[1], "ry") == 0){
-      strcpy(msg[0], "Sn");
-      sendToPlayers(th_data.conn_sct_dsc, msg[0]);
-      createGameThread(th_data);
-    }
-    else{
-      struct msgbuf sender;
-      sender.mtype = 1;
-      int msgSucces;
-      for(int i = 0; i < 2; i++){
-        if(strcmp(msg[i], "ry") == 0){
-          strcpy(msg[0], "Sn");
-          writeMsg(th_data.conn_sct_dsc[i], msg[0], sizeof(char) * strlen(msg[0]));
-          sender.conn_sct_dsc = th_data.conn_sct_dsc[i];
-          mutex_lock(th_data.ipcid.semid, 1, 1);//block opssibility of sending messages
-          printf("Send nr 0 to Queue\n");
+    struct msgbuf sender;
+    sender.mtype = 1;
+    int msgSucces;
+    for(int i = 0; i < 2; i++){
+      if(strcmp(msg[i], "ry") == 0){
+        strcpy(msg[0], "Sn");
+        if(!writeMsg(th_data.conn_sct_dsc[i], msg[0], sizeof(char) * strlen(msg[0])))
+          pthread_exit(NULL);
+        sender.conn_sct_dsc = th_data.conn_sct_dsc[i];
+        mutex_lock(th_data.ipcid.semid, 1, 1);//block opssibility of sending messages
+        printf("Send nr 0 to Queue\n");
+        fflush(stdout);
+        msgSucces = msgsnd(th_data.ipcid.msgid, &sender, sizeof(sender.conn_sct_dsc), 0);
+        if ( msgSucces == -1){
+          printf("Błąd przy próbie wysłania komunikatu\n");
           fflush(stdout);
-          msgSucces = msgsnd(th_data.ipcid.msgid, &sender, sizeof(sender.conn_sct_dsc), 0);
-          if ( msgSucces == -1){
-            printf("Błąd przy próbie wysłania komunikatu\n");
-            fflush(stdout);
-            exit(1);
-          }
-          else{
-            mutex_unlock(th_data.ipcid.semid, 0, 1);//allow matchClients function to take message
-          }
-          mutex_unlock(th_data.ipcid.semid, 1, 1);
+          exit(1);
         }
+        else{
+          mutex_unlock(th_data.ipcid.semid, 0, 1);//allow matchClients function to take message
+        }
+        mutex_unlock(th_data.ipcid.semid, 1, 1);
       }
     }
   }
+  pthread_exit(NULL);
 }
 
 
@@ -482,12 +568,13 @@ void *StartGame(void *t_data){
   //set who's turn is now
   strcpy(msgToClient[0], "nxx");
   strcpy(msgToClient[1], "nxo");
-  writeMsg(th_data.conn_sct_dsc[0], msgToClient[0], sizeof(char) * strlen(msgToClient[0]));
-  writeMsg(th_data.conn_sct_dsc[1], msgToClient[1], sizeof(char) * strlen(msgToClient[1]));
-
+  if(!writeMsg(th_data.conn_sct_dsc[0], msgToClient[0], sizeof(char) * strlen(msgToClient[0]) ))
+    endGameForClient(th_data, 'O', lastMsg[1]);
+  if(!writeMsg(th_data.conn_sct_dsc[1], msgToClient[1], sizeof(char) * strlen(msgToClient[1]) ))
+    endGameForClient(th_data, 'X', lastMsg[0]);
   //Game loop
   while(won == 'n'){
-    for(int i =0; i <2; i++){
+    for(int i = 0; i < 2; i++){
       if(won == 'n'){
         do{
           readMsg(th_data.conn_sct_dsc[i], newMsg, lastMsg[i], buffer);
@@ -495,11 +582,11 @@ void *StartGame(void *t_data){
             field = (int)newMsg[0] - (int)'0';
           else{
             if(i == 0)
-              won = 'O';
+              endGameForClient(th_data, 'O', lastMsg[1]);
             else
-              won = 'X';
+              endGameForClient(th_data, 'X', lastMsg[0]);
           }
-        }while(!checkMove(th_data.conn_sct_dsc, &turn, field, tab) && newMsg[0] != 'e');
+        }while(!checkMove(th_data, &turn, field, tab, lastMsg) && newMsg[0] != 'e');
         if(won == 'n')
           won = checkWinCondition(tab);
       }
@@ -519,16 +606,12 @@ void *matchClients(void *t_data) {
     perror("Błąd przy próbie odłączenia wątku matchClients od wątku macierzystego.\n");
     exit(-1);
   }
-  struct thread_data_t *gameData;
   struct thread_data_t th_data = *((struct thread_data_t*)t_data);
   free(t_data);
-  int clients_dsc[2], i = 0;
-  int msgSucces, create_result;
-  pthread_t thread;
+  int msgSucces, i = 0;
   struct msgbuf receiver;
 
-  while(1)
-  {
+  while(1){
     mutex_lock(th_data.ipcid.semid, 0, 1);
     //receive msg of any type( 4 argument == 0 mean any type of msg)
     msgSucces = msgrcv(th_data.ipcid.msgid, &receiver, sizeof(receiver.conn_sct_dsc), 0, 0);
@@ -537,7 +620,6 @@ void *matchClients(void *t_data) {
       printf("Argumenty msgid=%d\nsender.conn_sct_dsc=%d\n", th_data.ipcid.msgid, receiver.conn_sct_dsc);
     }
     else{
-      clients_dsc[i] = receiver.conn_sct_dsc;
       th_data.conn_sct_dsc[i] = receiver.conn_sct_dsc;
       i++;
       printf("Dodaje klienta do gry.\n");
@@ -546,15 +628,6 @@ void *matchClients(void *t_data) {
     if(i == 2){
       i = 0;
       createGameThread(th_data);
-      /*gameData = (struct thread_data_t *)malloc(sizeof(struct thread_data_t));
-      (*gameData).conn_sct_dsc[0] = clients_dsc[0];
-      (*gameData).conn_sct_dsc[1] = clients_dsc[1];
-      (*gameData).ipcid = th_data.ipcid;
-      create_result = pthread_create(&thread, NULL, StartGame, (void *)gameData);
-      if (create_result){
-         printf("Błąd przy próbie utworzenia wątku dobierajacego w pary klientów, kod błędu: %d\n", create_result);
-         exit(-1);
-      }*/
     }
   }
   pthread_exit(NULL);
