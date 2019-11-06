@@ -78,3 +78,4 @@ dkms.conf
 hs_err_pid*
 /Client/build/
 /Client/nbproject/private/
+/Client/dist/

@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package clienttictactoe;
+package clienttictactoe.game;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -24,8 +24,6 @@ import java.util.logging.Logger;
  */
 public class ServerConnetioner {
     
-    
-    private static int port;
     private static Socket socket;
     private static BufferedWriter bw;
     private static BufferedReader br;
@@ -65,7 +63,6 @@ public class ServerConnetioner {
             port = 1235;
         if(IPaddr == null)
             IPaddr = "localhost";
-        ServerConnetioner.port = port;
         InetAddress addr = null;
         OutputStream os = null;
         InputStream is = null;
@@ -80,7 +77,7 @@ public class ServerConnetioner {
         }
         bw = new BufferedWriter(new OutputStreamWriter(os));
         br = new BufferedReader(new InputStreamReader(is));
-        System.out.println("Connected to " + addr);
+        System.out.println("Połączono z  " + addr);
     }
     
     /**
@@ -117,12 +114,16 @@ public class ServerConnetioner {
      */
     public static void closeConnection(){
         try {
+            //closing connection
             System.out.println("Zamykam połączenie");
             bw.close();
             br.close();
             socket.close();
         } catch (IOException ex) {
             Logger.getLogger(ServerConnetioner.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        catch(NullPointerException ex){
+            //Connection wasn't created. Just skip all operations
         }
     }
 }

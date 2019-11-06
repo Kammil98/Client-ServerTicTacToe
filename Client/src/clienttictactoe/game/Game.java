@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package clienttictactoe;
+package clienttictactoe.game;
 
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -19,21 +19,24 @@ import window.MainWindowFrame;
  */
 public class Game  implements ActionListener{
 
+    private MessageHandler worker;
     private final Timer timer;
     private final GameJPanel panel;
-    private static char turn;
-    private static char sign;
+    private volatile static char turn;
+    private volatile static char sign;
+    
+    
     /**
      * Connections per second with server
      */
     private int CPS;
     
-    private void clearBoard(){
+    final void clearBoard(){
         char[] board;
         board = new char[9];
         for(int i = 0; i < 9; i++)
             board[i] = '-';
-        panel.setBoard(board);
+        getPanel().setBoard(board);
     }
     
     
@@ -51,10 +54,12 @@ public class Game  implements ActionListener{
         timer = new Timer(1000 / CPS, this);
         timer.setInitialDelay(0);
         timer.start();
+        worker = new MessageHandler(this);
+        worker.execute();
     }
     
     
-    private void endGame(String msg){
+    void endGame(String msg){
         int n;
         String dialogMsg;
         String[] options = {"Tak", "Nie"};
@@ -76,33 +81,9 @@ public class Game  implements ActionListener{
             msg = "rn" + '\n';
         ServerConnetioner.writeMsg(msg);
         if(n == 1){
-            MainWindowFrame frame = (MainWindowFrame) SwingUtilities.getWindowAncestor(panel);
+            MainWindowFrame frame = (MainWindowFrame) SwingUtilities.getWindowAncestor(getPanel());
             frame.CloseWindow();
             System.exit(0);
-        }
-    }
-    
-    private void handleReceivedMsg(String msg){
-        if(msg == null)
-            return;
-        switch(msg.charAt(0)){
-            case 'n'://new Game
-                clearBoard();
-                panel.setGameState("Połączono");
-                setTurn(msg.charAt(1));
-                setSign(msg.charAt(2));
-            case 't'://change turn
-                setTurn(msg.charAt(1));
-                break;
-            case 's'://set sign on postion
-                panel.setSign(msg.charAt(1), msg.charAt(2) - '0');
-                break;
-            case 'w'://someone won
-                endGame(msg);
-                break;
-            case 'S'://search new Game
-                setSign(msg.charAt(1));
-                panel.setGameState("Oczekiwanie");
         }
     }
     
@@ -113,9 +94,10 @@ public class Game  implements ActionListener{
      */
     @Override
     public void actionPerformed(ActionEvent e) {
-        String msg;
-        msg = ServerConnetioner.readMsg();
-        handleReceivedMsg(msg);
+        if(!worker.isDone())
+            return;
+        worker = new MessageHandler(this);
+        worker.execute();
     }
 
     
@@ -155,8 +137,8 @@ public class Game  implements ActionListener{
     /**
      * @param aTurn the turn to set
      */
-    public void setTurn(char aTurn) {
-        panel.setTurn(String.valueOf(aTurn));
+    void setTurn(char aTurn) {
+        getPanel().setTurn(String.valueOf(aTurn));
         turn = aTurn;
     }
 
@@ -164,8 +146,15 @@ public class Game  implements ActionListener{
     /**
      * @param aSign the sign to set
      */
-    public void setSign(char aSign) {
-        panel.setSign(String.valueOf(aSign));
+    void setSign(char aSign) {
+        getPanel().setSign(String.valueOf(aSign));
         sign = aSign;
+    }
+
+    /**
+     * @return the panel
+     */
+    GameJPanel getPanel() {
+        return panel;
     }
 }

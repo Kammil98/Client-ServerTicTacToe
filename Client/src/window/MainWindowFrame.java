@@ -5,8 +5,10 @@
  */
 package window;
 
-import clienttictactoe.Game;
-import clienttictactoe.ServerConnetioner;
+import window.listeners.MainWindowListener;
+import window.listeners.WindowMouseListener;
+import clienttictactoe.game.Game;
+import clienttictactoe.game.ServerConnetioner;
 import java.awt.BorderLayout;
 import javax.swing.JPanel;
 
@@ -16,8 +18,10 @@ import javax.swing.JPanel;
  */
 public class MainWindowFrame extends javax.swing.JFrame {
     
+    private final GameJPanel gamePanel;
+    private final ConnectionJPanel connPanel;
     private JPanel activePanel;
-    private final AnimationDrawer drawer;
+    private AnimationDrawer drawer;
     private Game game;
     
     /**
@@ -27,15 +31,18 @@ public class MainWindowFrame extends javax.swing.JFrame {
         super("Tic Tac Toe");
         initComponents();
         addMouseListener(new WindowMouseListener());
+        addWindowListener(new MainWindowListener());
         setLayout(new BorderLayout(0, 0));
-        activePanel = new GameJPanel();
-        add(activePanel, BorderLayout.CENTER);
+        gamePanel = new GameJPanel();
+        connPanel = new ConnectionJPanel();
+        activePanel = connPanel;
+        
+        add(connPanel, BorderLayout.CENTER);
         activePanel.setVisible(true);
         pack();
         setSize(500, 400);
         //setResizable(false);
-        drawer = new AnimationDrawer(getActivePanel(), 40);
-        game = new Game((GameJPanel)activePanel, 250);
+        
     }
 
     /**
@@ -51,6 +58,22 @@ public class MainWindowFrame extends javax.swing.JFrame {
     }
     
     
+    /**
+     * Swap to GameJPanel and prepare game
+     */
+    public void startGame(){
+        activePanel.setVisible(false);
+        activePanel = gamePanel;
+        add(gamePanel, BorderLayout.CENTER);
+        activePanel.setVisible(true);
+        game = new Game((GameJPanel) gamePanel, 250);
+        drawer = new AnimationDrawer(activePanel, 40);
+    }
+    
+    
+    /**
+     * Terminate this window and disconnect server
+    */
     public void CloseWindow(){
         setVisible(false);
         dispose();
@@ -122,5 +145,19 @@ public class MainWindowFrame extends javax.swing.JFrame {
      */
     public final JPanel getActivePanel() {
         return activePanel;
+    }
+
+    /**
+     * @return the gamePanel
+     */
+    public JPanel getGamePanel() {
+        return gamePanel;
+    }
+
+    /**
+     * @return the connPanel
+     */
+    public JPanel getConnPanel() {
+        return connPanel;
     }
 }

@@ -3,13 +3,15 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package window;
+package window.listeners;
 
-import clienttictactoe.Game;
-import clienttictactoe.ServerConnetioner;
+import clienttictactoe.game.Game;
+import clienttictactoe.game.ServerConnetioner;
 import java.awt.Point;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
+import window.GameJPanel;
+import window.MainWindowFrame;
 
 /**
  *

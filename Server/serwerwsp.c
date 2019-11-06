@@ -18,7 +18,7 @@
 #include <pthread.h>
 
 #define KEY 1234
-#define SERVER_PORT 1235
+#define SERVER_PORT 1234
 #define MAX_GAMES 100
 #define QUEUE_SIZE 5 // this is ignored anyway
 #define END_OF_MSG '-'
