@@ -339,6 +339,11 @@ bool checkMove(struct thread_data_t th_data, char *sign, int field, char tab[], 
     sendToPlayers(th_data, msg, lastMsg);
     return true;
   }
+  strcpy(msg, "f");
+  if(*sign == 'x')
+    writeMsg(th_data.conn_sct_dsc[0], msg, sizeof(char));
+  else
+    writeMsg(th_data.conn_sct_dsc[1], msg, sizeof(char));
   return false;
 }
 
