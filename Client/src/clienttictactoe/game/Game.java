@@ -79,7 +79,8 @@ public class Game  implements ActionListener{
             msg = "ry" + '\n';
         else
             msg = "rn" + '\n';
-        ServerConnetioner.writeMsg(msg);
+        MessageHandler writerWorker = new MessageHandler(msg);
+        writerWorker.execute();
         if(n == 1){
             MainWindowFrame frame = (MainWindowFrame) SwingUtilities.getWindowAncestor(getPanel());
             frame.CloseWindow();

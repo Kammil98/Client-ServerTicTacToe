@@ -5,6 +5,7 @@
  */
 package clienttictactoe.game;
 
+import javax.swing.JOptionPane;
 import javax.swing.SwingWorker;
 
 /**
@@ -15,6 +16,8 @@ import javax.swing.SwingWorker;
 public class MessageHandler extends SwingWorker<Void, Void>{
 
     private final Game game;
+    private final String msgToSrever;
+    
     
     /**
      * Constructor of MesssageHandler class
@@ -22,7 +25,19 @@ public class MessageHandler extends SwingWorker<Void, Void>{
      */
     public MessageHandler(Game game){
         this.game = game;
+        this.msgToSrever = null;
     }
+    
+    
+    /**
+     * Constructor of MesssageHandler class
+     * @param msg
+     */
+    public MessageHandler(String msg){
+        this.game = null;
+        this.msgToSrever = msg;
+    }
+    
     
     private void handleReceivedMsg(String msg){
         if(msg == null)
@@ -35,6 +50,9 @@ public class MessageHandler extends SwingWorker<Void, Void>{
                 game.setSign(msg.charAt(2));
             case 't'://change turn
                 game.setTurn(msg.charAt(1));
+                break;
+            case 'f'://fail in making move
+                JOptionPane.showMessageDialog(game.getPanel(), "Błędny ruch.");
                 break;
             case 's'://set sign on postion
                 game.getPanel().setSign(msg.charAt(1), msg.charAt(2) - '0');
@@ -50,9 +68,14 @@ public class MessageHandler extends SwingWorker<Void, Void>{
     
     @Override
     protected Void doInBackground() throws Exception {
-        String msg;
-        msg = ServerConnetioner.readMsg();
-        handleReceivedMsg(msg);
+        if(msgToSrever == null){//reader function
+            String msg;
+            msg = ServerConnetioner.readMsg();
+            handleReceivedMsg(msg);
+        }
+        else{//writer function
+            ServerConnetioner.writeMsg(msgToSrever);
+        }
         return null;
     }
     

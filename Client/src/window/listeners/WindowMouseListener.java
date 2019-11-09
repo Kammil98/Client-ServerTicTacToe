@@ -6,6 +6,7 @@
 package window.listeners;
 
 import clienttictactoe.game.Game;
+import clienttictactoe.game.MessageHandler;
 import clienttictactoe.game.ServerConnetioner;
 import java.awt.Point;
 import java.awt.event.MouseEvent;
@@ -68,7 +69,8 @@ public class WindowMouseListener implements MouseListener{
         }
         if(Game.getSign() == Game.getTurn() && fieldClicked != -1 && Game.getSign() != 'n'){
             String msg = String.valueOf(fieldClicked) + '\n';
-            ServerConnetioner.writeMsg(msg);
+            MessageHandler writerWorker = new MessageHandler(msg);
+            writerWorker.execute();
         }
     }
     
